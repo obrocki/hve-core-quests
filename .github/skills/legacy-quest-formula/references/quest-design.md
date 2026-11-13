@@ -17,4 +17,4 @@ Keep the quests in this order. Each brief should connect its objective to eviden
 | 11 | Responsible AI and experiments | Challenge unsupported AI claims and design a measurable, ethical experiment. |
 | 12 | Implementation, review, and reporting | Implement a scoped improvement, review it, and communicate evidence, limitations, and next steps. |
 
-Keep the exercises progressively connected but independently understandable. Include optional hints and nonblocking easter eggs; do not make hidden clues or flags a proxy for learning. The final quest combines implementation, review, and a concise board-facing report; it is not proof of competency by itself.
+Keep the exercises progressively connected but independently understandable. Include optional hints and nonblocking easter eggs; include a twelve-entry clue manifest and one flag check per quest for discovery/readiness only, never as a proxy for learning. The final quest combines implementation, review, and a concise board-facing report; it is not proof of competency by itself. Generated brief files belong in the selected output destination.

@@ -1,0 +1,176 @@
+name: eagledesk-quests
+description: Response-only smoke probes over twelve quest-relevant fictional evidence cases. These do not test a generated app or constitute quest completion.
+type: capability
+defaults:
+  runs: 1
+  timeout: 180s
+  executor: copilot-sdk
+scoring:
+  threshold: 1.0
+stimuli:
+  - name: quest-01-documentation-drift
+    prompt: "Read the staged migration memo. Identify the old seat-hold claim that needs verification and distinguish the archive from later rewrites."
+    agent_environment:
+      files:
+        - src: ../../docs/lore/migration-memo.md
+          dest: evidence/migration-memo.md
+    graders:
+      - type: output-matches
+        name: serialization-claim
+        config: { pattern: '(?i)(serializ|lock)' }
+      - type: output-matches
+        name: archive-distinction
+        config: { pattern: '(?i)(archive|source.only|historical)' }
+  - name: quest-02-seat-trace
+    prompt: "Read the staged migration note and changelog. What is known about the historical seat-hold path, and what should research verify before describing later behavior?"
+    agent_environment:
+      files:
+        - src: ../../docs/lore/migration-memo.md
+          dest: evidence/migration-memo.md
+        - src: ../../docs/lore/CHANGELOG.md
+          dest: evidence/CHANGELOG.md
+    graders:
+      - type: output-matches
+        name: historical-seat-hold
+        config: { pattern: '(?i)(seat.lock|seat hold|seatlock)' }
+      - type: output-matches
+        name: verify-assumptions
+        config: { pattern: '(?i)(verify|not.*assum|uncertain|evidence|research)' }
+  - name: quest-03-empathy
+    prompt: "Read the staged shift memo and describe Doris's operational need and why the scenario should be validated."
+    agent_environment:
+      files:
+        - src: ../../docs/lore/shift-memo.md
+          dest: evidence/shift-memo.md
+    graders:
+      - type: output-matches
+        name: rebooking
+        config: { pattern: '(?i)(rebook|fourteen|14.step)' }
+      - type: output-matches
+        name: evidence-limit
+        config: { pattern: '(?i)(fictional|validat|assumption|synthetic)' }
+  - name: quest-04-meeting
+    prompt: "Read the staged fictional transcript. Identify a requirement and a significant unknown for the fare feature."
+    agent_environment:
+      files:
+        - src: ../../docs/lore/ceo-meeting.md
+          dest: evidence/ceo-meeting.md
+    graders:
+      - type: output-matches
+        name: uncertainty
+        config: { pattern: '(?i)(no trained model|no.*data|unknown|lack|not.*model)' }
+      - type: output-matches
+        name: requirement
+        config: { pattern: '(?i)(explain|rollback|decision owner|measure)' }
+  - name: quest-05-backlog
+    prompt: "Read the staged ticket ledger. Identify the incident that should be triaged and explain a reason."
+    agent_environment:
+      files:
+        - src: ../../docs/lore/backlog.md
+          dest: evidence/backlog.md
+    graders:
+      - type: output-matches
+        name: incident
+        config: { pattern: '(?i)(14C|B-01)' }
+      - type: output-matches
+        name: triage-reason
+        config: { pattern: '(?i)(incident|two passengers|priority|risk|duplicate)' }
+  - name: quest-06-architecture
+    prompt: "Read the staged migration memo. Explain one coupling or migration risk and distinguish the archive from runnable layers."
+    agent_environment:
+      files:
+        - src: ../../docs/lore/migration-memo.md
+          dest: evidence/migration-memo.md
+    graders:
+      - type: output-matches
+        name: migration
+        config: { pattern: '(?i)(migrat|database|postgres)' }
+      - type: output-matches
+        name: archived
+        config: { pattern: '(?i)(archive|source.only|not.*run)' }
+  - name: quest-07-race
+    prompt: "Read the staged ticket and migration note. State the 14C symptom, explain why the old serialization claim is not enough to establish current behavior, and name evidence to gather next."
+    agent_environment:
+      files:
+        - src: ../../docs/lore/backlog.md
+          dest: evidence/backlog.md
+        - src: ../../docs/lore/migration-memo.md
+          dest: evidence/migration-memo.md
+    graders:
+      - type: output-matches
+        name: exceptional-seat
+        config: { pattern: '(?i)(14C|B-01)' }
+      - type: output-matches
+        name: verify-historical-claim
+        config: { pattern: '(?i)(serializ|runbook|verify|rewrite|evidence)' }
+  - name: quest-08-security
+    prompt: "Read the staged security memo. Distinguish the archived query issue from the running surface."
+    agent_environment:
+      files:
+        - src: ../../docs/lore/security-memo.md
+          dest: evidence/security-memo.md
+    graders:
+      - type: output-matches
+        name: concatenation
+        config: { pattern: '(?i)(concatenat|injection)' }
+      - type: output-matches
+        name: archive-scope
+        config: { pattern: '(?i)(not.*running|archive|source.only)' }
+  - name: quest-09-dependencies
+    prompt: "Read the staged ticket ledger. For the missing DLL report, identify the evidence still needed to assess dependency provenance and a supply-chain follow-up."
+    agent_environment:
+      files:
+        - src: ../../docs/lore/backlog.md
+          dest: evidence/backlog.md
+    graders:
+      - type: output-matches
+        name: dependency-ticket
+        config: { pattern: '(?i)(B-06|missing DLL|dependency)' }
+      - type: output-matches
+        name: follow-up
+        config: { pattern: '(?i)(version|license|provenance|inventory|update|audit|vulnerab|hash|supplier)' }
+  - name: quest-10-privacy
+    prompt: "Read the staged security memo and backlog. Identify sensitive data and an access or retention concern; recommend a proportionate control."
+    agent_environment:
+      files:
+        - src: ../../docs/lore/security-memo.md
+          dest: evidence/security-memo.md
+        - src: ../../docs/lore/backlog.md
+          dest: evidence/backlog.md
+    graders:
+      - type: output-matches
+        name: passport
+        config: { pattern: '(?i)passport' }
+      - type: output-matches
+        name: control
+        config: { pattern: '(?i)(minimi|retention|encrypt|access|remov|keyboard)' }
+  - name: quest-11-responsible-ai
+    prompt: "Read the staged CEO meeting. Explain what is known about the proposed fare feature, what is not established, and one responsible next step."
+    agent_environment:
+      files:
+        - src: ../../docs/lore/ceo-meeting.md
+          dest: evidence/ceo-meeting.md
+    graders:
+      - type: output-matches
+        name: random
+        config: { pattern: '(?i)random' }
+      - type: output-matches
+        name: not-trained
+        config: { pattern: '(?i)(not|no|isn.t).{0,35}(trained|model)' }
+  - name: quest-12-regression
+    prompt: "Read the staged ticket, migration note, and shift memo. Propose a bounded improvement with an acceptance test and explain what the evidence does not establish."
+    agent_environment:
+      files:
+        - src: ../../docs/lore/backlog.md
+          dest: evidence/backlog.md
+        - src: ../../docs/lore/migration-memo.md
+          dest: evidence/migration-memo.md
+        - src: ../../docs/lore/shift-memo.md
+          dest: evidence/shift-memo.md
+    graders:
+      - type: output-matches
+        name: scoped-regression
+        config: { pattern: '(?i)(test|acceptance|criteria|verify)' }
+      - type: output-matches
+        name: evidence-limits
+        config: { pattern: '(?i)(fictional|not.*establish|assumption|limitation|verify|evidence)' }

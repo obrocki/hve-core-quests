@@ -1,0 +1,4 @@
+node_modules/
+.copilot-tracking/
+evals/results/
+vally-results/

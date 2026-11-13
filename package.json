@@ -1,0 +1,13 @@
+{
+  "name": "hve-core-quests",
+  "private": true,
+  "version": "1.0.0",
+  "license": "MIT",
+  "scripts": {
+    "eval:lint": "vally lint --eval-spec evals/",
+    "eval": "vally eval --eval-spec evals/eagledesk-quests/eval.yaml --require-pass"
+  },
+  "devDependencies": {
+    "@microsoft/vally-cli": "0.20.0"
+  }
+}

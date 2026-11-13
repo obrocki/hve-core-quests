@@ -14,6 +14,6 @@ Give the frontend a Windows 95 battleship-gray desktop appearance. Include gener
 
 Use only open-source libraries, components, and frameworks. Include license notices and attribution in the generated output for dependencies and reused assets. Do not rely on unlicensed copied assets.
 
-## Instruction-package boundary
+## Repository boundary
 
-This repository contains the formula and its Markdown guidance only. Do not add application code, executable generators or tests, runtime configuration, code templates, manifests, binary screenshots, generated-instance quest files, or a runnable reference app here. Historical Microsoft-stack source-only fossils may be requirements for downstream generated exercise material, not code retained in this skill package.
+Keep one public formula skill at `.github/skills/legacy-quest-formula/`. Internal evaluation configuration, synthetic evidence fixtures, focused readiness helpers, and example images/documentation may support that skill. They are not another public skill or a second runnable application. Do not add a checked-in generated app or duplicate source-template application tree. Historical Microsoft-stack fossils belong in downstream generated exercise material, not as a runnable root application.
