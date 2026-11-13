@@ -1,5 +1,0 @@
-Type=OleDll
-Class=SeatLock; SeatLock.cls
-Module=Reservation; Reservation.bas
-Name="EagleDeskLegacy"
-' Historical reference: missing SeatLock.dll; not distributed.

@@ -5,16 +5,9 @@
   "license": "MIT",
   "scripts": {
     "eval:lint": "vally lint --eval-spec evals/",
-    "eval": "vally eval --suite eagledesk-quests --require-pass",
-    "test:ui": "node tests/ui.cjs",
-    "test:generator": "pwsh tests/test-generator.ps1"
-  },
-  "dependencies": {
-    "98.css": "0.1.21"
+    "eval": "vally eval --eval-spec evals/eagledesk-quests/eval.yaml --require-pass"
   },
   "devDependencies": {
-    "@microsoft/vally-cli": "0.20.0",
-    "pgsql-ast-parser": "^12.0.1",
-    "playwright": "1.55.1"
+    "@microsoft/vally-cli": "0.20.0"
   }
 }

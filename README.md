@@ -1,42 +1,43 @@
 # HVE Core Quests: EagleDesk 95 🦅✈️
 
-**High Velocity Eagle Airlines** invites you to investigate a fictional, 30-year-old reservations system. Follow the evidence from the archive to a modern API, and learn HVE Core through twelve quests. This is intentionally flawed training software, **not for production, real passenger data, or public deployment**.
+Use the **High Velocity Eagle Airlines** exercise formula to investigate a fictional, 30-year-old reservations system. Follow evidence from the archive to a modern API and learn HVE Core through twelve quests. The generated system is intentionally flawed training software, **not for production, real passenger data, or public deployment**. This repository contains the formula and internal support—not a runnable instance.
 
-![EagleDesk 95 running locally with a flight and seat selected](docs/images/eagledesk.png)
+![Existing EagleDesk 95 example screenshot with a flight and seat selected](docs/images/eagledesk.png)
+
+> This is the existing screenshot from the earlier EagleDesk 95 reference instance. It is an example artifact, not a newly generated runtime or an app included in this repository.
 
 ## Start playing
 
-Open `app/web/index.html` directly in a modern browser; no server or installation is required. Search flights, select a row and seat, and hold it locally. Offline holds are stored in that browser's localStorage, not shared with anyone else. For a static server, run `npx serve app/web` and open its local URL; API absence falls back to local mock data. Begin with [The Archivist](quests/01-the-archivist/README.md).
+Install [HVE Core](https://github.com/microsoft/hve-core/blob/main/docs/getting-started/install.md). With this repository open in a skill-aware Copilot workspace, the formula is discoverable at `.github/skills/legacy-quest-formula/SKILL.md`; in another workspace, copy that skill directory into its `.github/skills/` directory. Invoke `legacy-quest-formula` with a nonblank `SystemName` and an explicitly selected safe output destination. `AirlineName` and `AirlineCode` are optional; the defaults are High Velocity Eagle Airlines and `HVE`. The generated exercise belongs in that destination, not in this repository.
 
-For the optional connected system, install Docker Desktop and run `docker compose -f .devcontainer/docker-compose.yml up --build`; open <http://127.0.0.1:8080/>. The WebForms archive runs at <http://127.0.0.1:8080/webforms/>. Stop with `docker compose -f .devcontainer/docker-compose.yml down`. The `local-demo-only` database password is deliberately public and is for an isolated demo only. A compatible devcontainer host can open `.devcontainer/devcontainer.json`.
+After generation, follow that output's README for local launch instructions and begin with quest 1 under its `quests/` directory. The offline frontend should work locally without a backend or container. Any optional connected path is generated separately; follow its generated instructions rather than running application commands from this repository.
 
 ### Generate another instance
 
-Install [HVE Core](https://github.com/microsoft/hve-core/blob/main/docs/getting-started/install.md) and make the [legacy-quest-formula](.github/skills/hve-quests/legacy-quest-formula/SKILL.md) skill available to your agent. Generation and checks require PowerShell 7, Node.js 22.14 or newer, npm and Playwright's Chromium browser; simply opening the frontend requires none of these. Invoke `/legacy-quest-formula` with a **required system name** and an empty output directory. Equivalent PowerShell 7 invocation:
-
-```powershell
-npm install
-npx playwright install chromium
-pwsh .github/skills/hve-quests/legacy-quest-formula/scripts/New-QuestInstance.ps1 -SystemName 'EagleDesk 95' -AirlineName 'High Velocity Eagle Airlines' -AirlineCode HVE -OutputPath 'C:\temp\eagle-quest'
-```
-
-Non-reference names require Playwright to capture a new screenshot; the title bar, splash and README are customized. The three-letter airline code and airline name are optional. The generator refuses a nonempty destination.
+Use the [quest sequence](.github/skills/legacy-quest-formula/references/quest-design.md) and [generated-output layout](.github/skills/legacy-quest-formula/references/output-layout.md) as the formula. Its default exemplar is EagleDesk 95; names remain customizable, while the seat-hold, overbooking, concurrency, and deliberate 14C race scenario stay intact.
 
 ### Validate
 
-```powershell
-npm install
-npx playwright install chromium
-pwsh .github/skills/hve-quests/legacy-quest-formula/scripts/Test-QuestReadiness.ps1
-npm run test:ui
-npm run test:generator
+Repository maintainer checks require Node.js 22.14 or newer and npm for the pinned Vally 0.20.0 dependency, and PowerShell 7 for the output-readiness helpers. These are not requirements for invoking the formula or opening a generated frontend. To run the fixture-based suite:
+
+```shell
+npm ci
 npm run eval:lint
 npm run eval
 ```
 
-Readiness checks files, clue markers, hashes and generated-instance drift; `test:ui` exercises mock search and local holds and captures the screenshot. Vally lint checks suite structure. `npm run eval` runs response-only smoke probes and requires Copilot SDK model access; even a passing run is **not proof** that a learner completed any quest or that the HVE Core agents were natively invoked. Save and review each quest's requested artifact separately. For a flag, run `pwsh .github/skills/hve-quests/legacy-quest-formula/scripts/Test-QuestFlag.ps1 -Quest 1 -Flag '<value>'`.
+The [internal Vally suite](evals/eagledesk-quests/eval.yaml) has one response-only stimulus per quest, using the fictional Markdown evidence in `docs/lore/`. `eval:lint` checks suite structure; `eval` loads this explicit evaluation file and requires Copilot SDK model access, so probes may be unavailable in some environments. These probes are not checks of a generated app, native HVE execution, or learner competency. For an instance already generated in a separate destination, use the internal helpers:
+
+```powershell
+pwsh .github/skills/legacy-quest-formula/scripts/Test-QuestReadiness.ps1 -OutputPath 'C:\path\to\generated-output'
+pwsh .github/skills/legacy-quest-formula/scripts/Test-QuestFlag.ps1 -OutputPath 'C:\path\to\generated-output' -Quest 1 -Flag '<value>'
+```
+
+They check output structure and clue discovery, not application behavior or learner completion.
 
 ## Architecture and time travel
+
+This is the selected downstream exemplar stack; no application layer is built or started here.
 
 ```mermaid
 flowchart LR
@@ -55,7 +56,7 @@ flowchart LR
 | 2019 | A .NET 8 API accesses PostgreSQL; nginx serves the static frontend and proxies the API. |
 | 2024 | The CEO's "AI" fare endpoint uses random numbers and rules, not a trained model. |
 
-98.css is MIT; its bundled FontStruction fonts by lou are CC BY-SA 3.0. Notices are in `app/web/vendor/`. PostgreSQL, Mono, .NET, nginx and all listed packages are open source. Image and package versions and their transitive licenses should be reviewed before reuse.
+The earlier reference frontend used 98.css (MIT) and FontStruction fonts by lou (CC BY-SA 3.0). Their source files are not included here. Generated output must use open-source components and include applicable notices and attributions. Review image, package, and transitive licenses before reuse.
 
 ## People, scenarios and backlog
 
@@ -84,17 +85,17 @@ Each badge indicates the area of practice, not a claim of completion. Install th
 
 | Quest | Badge | HVE Core |
 |---|---|---|
-| [01 The Archivist](quests/01-the-archivist/README.md) | 📚 Docs | Documentation |
-| [02 Follow the Seat](quests/02-follow-the-seat/README.md) | 🔎 Research | RPI, rpi-researcher |
-| [03 Gate Agent Empathy](quests/03-gate-agent-empathy/README.md) | 💬 Design | DT Coach, UX/UI Designer |
-| [04 The CEO's Memo](quests/04-the-ceos-memo/README.md) | 📝 Requirements | Meeting Analyst, BRD Builder, PRD Builder |
-| [05 Ticket Counter](quests/05-ticket-counter/README.md) | 🎫 Backlog | Functional Planner, Backlog Manager, Issue Triage, Backlog Grooming |
-| [06 Strangler's Gambit](quests/06-stranglers-gambit/README.md) | 🏗️ Architecture | System Architecture Reviewer, ADR Creation |
-| [07 Seat 14C](quests/07-seat-14c/README.md) | 🔬 RCA | root-cause-analysis |
-| [08 Unlocked Hangar](quests/08-unlocked-hangar/README.md) | 🔒 Security | Security Planner, Security Reviewer |
-| [09 Contraband Cargo](quests/09-contraband-cargo/README.md) | 📦 Supply chain | SSSC Planner/Reviewer, Dependency Reviewer |
-| [10 Every Passenger](quests/10-every-passenger/README.md) | ♿ Inclusion | Accessibility and Privacy Planner/Reviewer |
-| [11 Autopilot Ethics](quests/11-autopilot-ethics/README.md) | ⚖️ Responsible AI | RAI Planner/Reviewer, Experiment Designer |
-| [12 Final Approach](quests/12-final-approach/README.md) | 🛬 Delivery | RPI implement, Code Review, pull-request skill, Engagement Report Generator |
+| 01 The Archivist | 📚 Docs | Documentation |
+| 02 Follow the Seat | 🔎 Research | RPI, rpi-researcher |
+| 03 Gate Agent Empathy | 💬 Design | DT Coach, UX/UI Designer |
+| 04 The CEO's Memo | 📝 Requirements | Meeting Analyst, BRD Builder, PRD Builder |
+| 05 Ticket Counter | 🎫 Backlog | Functional Planner, Backlog Manager, Issue Triage, Backlog Grooming |
+| 06 Strangler's Gambit | 🏗️ Architecture | System Architecture Reviewer, ADR Creation |
+| 07 Seat 14C | 🔬 RCA | root-cause-analysis |
+| 08 Unlocked Hangar | 🔒 Security | Security Planner, Security Reviewer |
+| 09 Contraband Cargo | 📦 Supply chain | SSSC Planner/Reviewer, Dependency Reviewer |
+| 10 Every Passenger | ♿ Inclusion | Accessibility and Privacy Planner/Reviewer |
+| 11 Autopilot Ethics | ⚖️ Responsible AI | RAI Planner/Reviewer, Experiment Designer |
+| 12 Final Approach | 🛬 Delivery | RPI implement, Code Review, pull-request skill, Engagement Report Generator |
 
-The [fictional changelog](docs/lore/CHANGELOG.md), [meeting transcript](docs/lore/ceo-meeting.md), and [backlog](docs/lore/backlog.md) are starting evidence. The flags establish clue discovery, not competency.
+The full sequence and objectives are in the [formula's quest design](.github/skills/legacy-quest-formula/references/quest-design.md); generated briefs live only in the selected output destination under `quests/01-*` through `quests/12-*`. The [fictional changelog](docs/lore/CHANGELOG.md), [meeting transcript](docs/lore/ceo-meeting.md), and [backlog](docs/lore/backlog.md) are internal evidence fixtures for the maintainer suite. Generated flags establish clue discovery, not competency.

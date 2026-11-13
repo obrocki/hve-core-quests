@@ -1,6 +1,4 @@
 node_modules/
-app/api/bin/
-app/api/obj/
 .copilot-tracking/
 evals/results/
 vally-results/

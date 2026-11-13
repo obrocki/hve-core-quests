@@ -1,9 +1,0 @@
-{
-  "name": "{{SYSTEM_NAME}}",
-  "dockerComposeFile": "docker-compose.yml",
-  "service": "api",
-  "workspaceFolder": "/workspace",
-  "shutdownAction": "stopCompose",
-  "forwardPorts": [8080],
-  "remoteUser": "root"
-}
