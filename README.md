@@ -1,4 +1,4 @@
-# HVE Core Quests: EagleDesk 95
+# HVE Core Quests: EagleDesk 95 🦅✈️
 
 **High Velocity Eagle Airlines** invites you to investigate a fictional, 30-year-old reservations system. Follow the evidence from the archive to a modern API, and learn HVE Core through twelve quests. This is intentionally flawed training software, **not for production, real passenger data, or public deployment**.
 
