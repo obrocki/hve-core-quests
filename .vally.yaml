@@ -1,0 +1,8 @@
+paths:
+  evals: evals
+  results: evals/results
+suites:
+  eagledesk-quests:
+    description: Twelve response-only quest smoke probes
+    evals:
+      - evals/eagledesk-quests/eval.yaml

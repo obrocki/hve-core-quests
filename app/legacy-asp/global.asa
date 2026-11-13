@@ -1,0 +1,5 @@
+<SCRIPT LANGUAGE="VBScript" RUNAT="Server">
+Sub Application_OnStart
+  Application("SeatLock") = "SeatLock.dll"
+End Sub
+</SCRIPT>
