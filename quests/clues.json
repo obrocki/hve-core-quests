@@ -1,0 +1,14 @@
+[
+  {"quest":1,"file":"docs/lore/migration-memo.md","marker":"CLUE-01"},
+  {"quest":2,"file":"docs/lore/migration-memo.md","marker":"CLUE-02"},
+  {"quest":3,"file":"docs/lore/shift-memo.md","marker":"CLUE-03"},
+  {"quest":4,"file":"docs/lore/ceo-meeting.md","marker":"CLUE-04"},
+  {"quest":5,"file":"docs/lore/backlog.md","marker":"CLUE-05"},
+  {"quest":6,"file":"docs/lore/migration-memo.md","marker":"CLUE-06"},
+  {"quest":7,"file":"app/db/001-schema.sql","marker":"CLUE-07"},
+  {"quest":8,"file":"docs/lore/security-memo.md","marker":"CLUE-08"},
+  {"quest":9,"file":"docs/lore/security-memo.md","marker":"CLUE-09"},
+  {"quest":10,"file":"docs/lore/security-memo.md","marker":"CLUE-10"},
+  {"quest":11,"file":"docs/lore/ceo-meeting.md","marker":"CLUE-11"},
+  {"quest":12,"file":"docs/lore/migration-memo.md","marker":"CLUE-12"}
+]
