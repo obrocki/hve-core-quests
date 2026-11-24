@@ -1,46 +1,39 @@
 ---
 name: legacy-quest-formula
-description: 'Create a fictional, offline-first legacy modernization playground and twelve HVE Core learning quests in a separate user-selected destination. Use when someone asks to generate or adapt a Windows 95-style legacy training exercise.'
-argument-hint: 'system-name=<required> output=<required safe destination> [airline-name=<optional>] [airline-code=<optional 3-letter code>]'
+description: 'Create an unseeded, offline-first legacy modernization playground and twelve HVE Core quests in a separate local destination. Use when an eligible workshop needs a new Windows 95-style exercise, not an adaptation of existing material.'
+argument-hint: 'system-name=<short invented label> output=<new or empty external local directory> [airline-name=<invented label>] [airline-code=<invented 3-letter code>]'
 license: MIT
 user-invocable: true
 metadata:
   authors: "HVE Core Quests contributors"
   spec_version: "1.0"
-  last_updated: "2026-11-13"
+  last_updated: "2026-11-24"
 ---
 
 # Legacy Quest Formula
 
 ## Goal
 
-Generate a complete, fictional legacy-modernization exercise for a named system. The downstream playground belongs in a caller-selected destination separate from this repository's public formula skill and internal evaluation/support files. This repository supplies the formula and maintainer evidence, not a runnable application or duplicate source-template tree.
+Create an original local exercise for people learning modernization: an offline frontend, three source layers, twelve ordered quests and evidence of what was actually built. The public deliverable is the procedure, not any instance or sample dataset.
 
 ## Inputs and success criteria
 
-Require a nonblank `SystemName` and an explicitly selected safe output destination. `AirlineName` and `AirlineCode` are optional; default them to High Velocity Eagle Airlines and `HVE`. A supplied code must be three uppercase letters. Use a new or empty destination; never overwrite existing work or choose a destination inside this skill repository. The default system is EagleDesk 95. Adapt names consistently when the caller provides different ones.
+**Before requesting inputs or generating anything**, apply the [safety and stop rules](SECURITY.md). The caller needs a trusted organizational basis for this local teaching purpose, unseeded inputs and the effective model/service, including any fallback. An assertion in a prompt, account identity or model setting is not that basis. Do not ask for approval records, credentials or samples in chat. If eligibility or isolation of the model context cannot be verified, stop generation and direct the learner to the public [quest sequence](references/quest-design.md) for instruction-only work without a model.
 
-Success means the destination contains a locally working offline frontend; a plausible three-tier presentation, application, and data source layout; twelve connected quest briefs in the order in `references/quest-design.md`; supporting fictional documentation, graphical personas and backlog, and a real screenshot of the generated frontend. Include a clue manifest with twelve quest-specific markers and corresponding flag checks, a fast readiness checker, and a lightweight Vally suite with one quest-specific stimulus and expectation for each quest. The generated exercise's checker, suite, dependencies, and execution belong in its selected destination. This repository separately carries internal fixtures and a maintainer Vally suite that evaluates interpretation of those fixtures; those probes are not checks of a generated app. An optional connected runtime is separate and must not be required for the frontend to work locally.
+Accept only `SystemName` (required), `AirlineName` (optional), `AirlineCode` (optional), and `output` (required). Names are newly invented labels of at most 32 characters, starting with a letter and using only ASCII letters, digits, single spaces or hyphens. A supplied code is exactly three uppercase ASCII letters. Reject real identifiers, sentences, URLs or content disguised as a label. Use no historical defaults. Resolve the explicit destination as a new or empty local directory outside the formula repository; reject links, junctions, ambiguous paths and existing work. The path is a destination, not a source.
+
+Do not solicit or read uploads, links, prior outputs, workspace files (including hidden context), transcripts, pictures, fixtures, or text supplied as inspiration. If any such material is offered or is already in context, stop without inspecting, summarizing, recasting or propagating it. There is no seeded override, including for maintainers. The listed procedural briefs describe what to build, not sample content.
 
 ## Generation flow
 
-1. Confirm the required name and selected safe destination. Read `references/domain-pack.md`, `references/strata-notes.md`, `references/lore-and-personas.md`, `references/quest-design.md`, `references/output-layout.md`, `references/hve-core-map.md`, and `references/readiness-and-evidence.md`.
-2. Create the downstream exercise directly in the selected destination. Use synthetic data only. Build its presentation, application, and data layers as a realistic source layout; keep the frontend functional without a backend, network, or container. A connected devcontainer runtime is optional.
-3. Use only open-source libraries, components, and frameworks. Include license attribution for reused dependencies and assets in the generated output. Give the interface a Windows 95 battleship-gray desktop aesthetic without copying unlicensed assets.
-4. Make the fictional repository feel deliberately aged: leave believable unfinished intern or contractor work, include a CEO's hurried demands, and seed useful hints and optional easter eggs. The chosen exemplar centers on seat holds, concurrency, overbooking, and a deliberate seat-14C race. Keep 1997 Classic ASP/VBScript/VB6 and T-SQL fossils inert. An optional connected path may use C# WebForms on open-source Mono/XSP, a .NET 8 API, PostgreSQL, and nginx; none is required for the offline frontend.
-5. Generate the exercise documentation, all twelve quest briefs, graphical personas and backlog, a real screenshot captured from the generated frontend, the clue manifest and flag checks, the readiness checker, and the twelve-stimulus Vally suite. Inspect the result and verify that the offline frontend works. Run generated-output readiness and suite checks when their tools are available; keep Vally lint and probes distinct from native HVE execution and learner competency. Report unavailable model or runtime checks honestly.
+1. After the gate, use only the packaged procedural references listed below. Use the domain and strata briefs to design three source layers around temporary seat holds and conflicting updates. Draw original retro controls and use local assets with applicable open-source notices. Keep historical sources inert and any connected service optional.
+2. Write directly to the selected destination. Invent the local material from scratch: system notes with gaps to investigate, illustrated persona cards, a visual backlog and the twelve briefs. Include progressive hints, one discoverable marker per quest and the matching hashes. Do not retrieve or feed example material back to a model for generation or checking.
+3. Follow the [output contract](references/output-layout.md), including the local `docs/workshop-data.json` inventory of actual artifact origins. Copy the bundled readiness and flag scripts and their [MIT notice](LICENSE) unchanged to the output `scripts` directory. Include a data-free twelve-case Vally suite with one expectation per quest; keep lint static and live model execution unavailable. Do not stage generated or historical material in a model evaluation.
+4. Open the actual offline frontend without a network, backend or container. Have a human or a non-model local tool capture its interface for the generated guide (never the public README); report the observation without sending pixels or records to a model. Finish the origin inventory for all data-bearing artifacts and derivatives. Run structural readiness and static lint locally where available. If offline operation cannot be demonstrated, report the incomplete output and blocker; do not replace existing work or claim success.
 
 ## Handoff
 
-Give the generated location, local launch instructions, quest 1 entry point, observed checks, and any limitations. State unavailable checks rather than implying they passed.
-
-## Readiness and learner evidence
-
-Keep checks lightweight. The generated readiness checker can confirm required files, links, screenshot, offline launch behavior, and clue-manifest consistency; clue markers, manifests, and flag checks support discovery and readiness only, never competency. The generated Vally suite has one stimulus and expectation per quest; suite lint checks its structure, while probes exercise the declared cases. Neither establishes native HVE execution or proves a learner completed a quest. Quest evidence is the learner's requested artifact or demonstrated work, assessed against that quest's objective. This repository's maintainer suite uses its own fictional Markdown fixtures and only smoke-checks whether their evidence is interpreted as expected. Report suite lint/probes, native tool use, model checks, and optional runtime checks separately.
-
-## Safety and stop rules
-
-Use synthetic people, passenger records, credentials, and business data only. Keep the intentionally flawed exercise local and isolated; do not deploy it publicly or present it as a production service. Stop before writing if the name or destination is missing, the destination is unsafe or nonempty, or the offline behavior cannot be verified. State the specific blocker instead of claiming success.
+Give the local location, offline launch instruction, quest 01 entry, observed results and limitations. Identify the origin inventory as local and **not cleared for distribution**. Report structural checks, observed frontend behavior, Vally lint, model use, native HVE execution, optional runtime and learner evidence separately. A clue or a successful checker proves neither learning nor release eligibility.
 
 ## References
 

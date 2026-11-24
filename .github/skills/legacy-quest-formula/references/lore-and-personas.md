@@ -1,7 +1,7 @@
-# Lore and personas
+# Writing local workshop material
 
-Use an obviously fictional cast and label scenarios as synthetic, not as validated research. The default lore can include Mags Hollis, who built an early version; Kevin, an intern whose unfinished changes remain; Globex, a contractor associated with hurried migrations; and Chad Maverick III, a CEO demanding an "AI" fix without a clear problem statement.
+Use this procedural brief only after the [input gate](../SECURITY.md). Do not look for background reading, named characters, example tickets, old workshop files, interviews, images or narratives to imitate. If the context contains such material, stop generation.
 
-Represent operational perspectives such as gate agent Doris, a travel agent, a call-center representative, a frequent flyer, and an operations manager. Show conflicting goals and workarounds through plausible artifacts such as a changelog, shift note, meeting record, migration memo, or backlog. Preserve ambiguity where investigation should resolve it; do not present lore as authoritative system behavior.
+In the local output, give learners several operational perspectives with conflicting goals. Let them distinguish a claim in a note from behavior they can observe. Write original, clearly invented documentation and a small visual board showing work and dependencies. Give the graphics text alternatives. Neither a persona nor its illustration is evidence of actual user research.
 
-Add relevant hints and optional easter eggs to reward careful exploration without blocking quest completion. Do not require learners to discover a secret flag or hidden message as evidence of competency.
+Place optional discovery hints where a learner performing the quest would encounter them. Keep clues independent of assessment: learners demonstrate an objective with their own work, not by recovering a token.

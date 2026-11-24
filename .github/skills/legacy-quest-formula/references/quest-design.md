@@ -1,16 +1,16 @@
 # Twelve-quest sequence
 
-Keep the quests in this order. Each brief should connect its objective to evidence from the fictional repository, state the expected learner artifact or demonstration, and provide progressive hints. Adapt HVE Core component names to the installed version; do not claim a tool was invoked unless it was.
+Keep the quests in this order. The public route uses these objectives without sample data or model calls; a learner can describe what they would inspect and which evidence is missing. In an eligible new local output, each brief points learners to evidence there, names the expected artifact or demonstration, and offers progressive hints. Do not import examples to fill a brief. Adapt HVE Core component names to the installed version; do not claim a tool was invoked unless it was.
 
 | # | Quest focus | Practice |
 |---|---|---|
 | 1 | Documentation | Orient through the system, inspect its existing documentation, and produce a grounded documentation improvement. |
 | 2 | Research | Trace a behavior through repository evidence and record sources and uncertainties. |
 | 3 | User empathy and design | Explore fictional users' needs and sketch an inclusive, evidence-labeled experience. |
-| 4 | Requirements | Turn the CEO's hurried demands and meeting evidence into testable requirements. |
+| 4 | Requirements | Separate a proposed change from its assumptions and write testable requirements. |
 | 5 | Backlog planning | Prioritize a coherent backlog with dependencies and acceptance criteria. |
 | 6 | Architecture and ADR | Compare modernization options and record a justified decision. |
-| 7 | Root cause | Investigate the deliberate seat-14C race and distinguish symptoms from causes. |
+| 7 | Root cause | Investigate competing seat holds; distinguish an observed symptom from a causal explanation. |
 | 8 | Security | Model threats and propose proportionate controls for the intentionally flawed exercise. |
 | 9 | Supply chain | Assess dependency and build provenance risks and define practical improvements. |
 | 10 | Accessibility and privacy | Identify access barriers and sensitive-data flows, then propose safeguards. |
