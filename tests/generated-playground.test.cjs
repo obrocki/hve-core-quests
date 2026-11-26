@@ -95,7 +95,7 @@ test('Vally MockExecutor and all composition graders leave an unconfigured brows
     seen.push([detail.metadata?.check, detail.metadata?.status, detail.evidence]);
   }
   assert.deepEqual(seen.map(([check, status]) => [check, status]), compositionChecks.map(check =>
-    [check, check === 'offline-startup' ? 'not-testable' : 'pass']), JSON.stringify(seen));
+    [check, check === 'offline-startup' ? 'not-run' : 'pass']), JSON.stringify(seen));
   assert.equal((await checkComposition(undefined, 'readiness')).status, 'not-testable');
   assert.equal((await checkComposition(repo, 'readiness')).status, 'fail');
 });
@@ -125,6 +125,7 @@ test('composition rejects disconnected sources and nonlocal and out-of-output fr
   assert.equal((await checkComposition(root, 'tier-wiring')).status, 'pass');
   write('app/logic/b.js', 'window.ProbeLogic = { count: () => 0 };\n');
   assert.match((await checkComposition(root, 'tier-wiring')).evidence, /No static chain/);
+  assert.equal((await checkComposition(root, 'offline-startup')).status, 'not-run');
   frontend(write);
   write('app/web/index.html', page.replace('<main>', '<img src="https://example.invalid/no.png"><main>'));
   assert.match((await checkComposition(root, 'tier-wiring')).evidence, /remote/);
@@ -138,6 +139,47 @@ test('composition rejects disconnected sources and nonlocal and out-of-output fr
   write('app/logic/b.mjs', "import { value } from '../store/a.mjs';\nexport const count = () => value;\n");
   write('app/store/a.mjs', 'export const value = 1;\n');
   assert.equal((await checkComposition(root, 'tier-wiring')).status, 'pass');
+});
+
+test('composition traces browser-global wrappers and explicit factory injection, not sibling loads', async t => {
+  const { root, write } = temp(t);
+  const wrap = (name, factory, args = '') => `
+    (function (host, create) {
+      if (typeof module === 'object' && module.exports) module.exports = create(${args});
+      else host.${name} = create(${args});
+    })(typeof globalThis === 'object' ? globalThis : this, ${factory});
+  `;
+  write('app/web/index.html', page);
+  write('app/store/a.js', wrap('LocalValues', '() => ({ read: () => 1 })'));
+  write('app/logic/b.js', wrap('LocalLogic', 'store => ({ read: () => store.read() })', 'host.LocalValues'));
+  write('app/web/c.js', "document.querySelector('main').textContent = String(window.LocalLogic.read());");
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'pass');
+
+  write('app/logic/b.js', wrap('LocalLogic', '() => ({ create: ({ storage }) => ({ read: () => storage.read() }) })'));
+  const ui = `
+    (() => {
+      const store = window.LocalValues;
+      const service = window.LocalLogic.create({ storage: store });
+      document.querySelector('main').textContent = String(service.read());
+    })();
+  `;
+  write('app/web/c.js', ui);
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'pass');
+  write('app/web/c.js', ui.replace('{ storage: store }', '{ storage: { read: () => 0 } }'));
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'fail');
+
+  write('app/store/a.js', wrap('LocalValues', '() => ({ open: () => ({ read: () => 1 }) })'));
+  write('app/logic/b.js', wrap('LocalLogic', '() => ({ create: storage => ({ read: () => storage.read() }) })'));
+  const classic = `
+    (function () {
+      var store = window.LocalValues.open(), service = window.LocalLogic.create(store);
+      document.querySelector('main').textContent = String(service.read());
+    })();
+  `;
+  write('app/web/c.js', classic);
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'pass');
+  write('app/web/c.js', classic.replace(', service', ';\nstore = { read: () => 0 };\nvar service'));
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'fail');
 });
 
 test('composition distinguishes wrong evidence from incomplete licensing and provenance evidence', async t => {
@@ -175,11 +217,42 @@ test('composition distinguishes wrong evidence from incomplete licensing and pro
   assert.match((await checkComposition(root, 'clue-discovery')).evidence, /duplicate or ambiguous JSON/);
 });
 
+test('dependency metadata separates SHA-1 integrity gaps from license gaps and corroborates only bound entries', async t => {
+  const { root, write } = temp(t);
+  structure(write);
+  const file = path.join(root, 'package-lock.json');
+  const lock = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const location = 'node_modules/@microsoft/vally-cli';
+  const known = require('../package-lock.json').packages[location];
+  async function check(entry) {
+    lock.packages[location] = entry;
+    write('package-lock.json', lock);
+    return checkComposition(root, 'dependency-evidence');
+  }
+  const sha1 = `sha1-${Buffer.alloc(20).toString('base64')}`;
+  const weak = await check({ ...known, integrity: sha1 });
+  assert.equal(weak.status, 'not-testable');
+  assert.match(weak.evidence, /0 license, 1 integrity, 1 SHA-1 only, 0 identity/);
+  const malformed = await check({ ...known, integrity: 'sha512-YQ==' });
+  assert.equal(malformed.status, 'not-testable');
+  assert.match(malformed.evidence, /0 license, 1 integrity, 0 SHA-1 only/);
+  assert.equal((await check({ ...known, integrity: `${sha1} ${known.integrity}` })).status, 'pass');
+
+  const missingLicense = { ...known, license: undefined };
+  assert.match((await check(missingLicense)).evidence, /1 corroborated by the author lock/);
+  const differentArtifact = await check({ ...missingLicense, resolved: 'https://example.invalid/another.tgz' });
+  assert.equal(differentArtifact.status, 'not-testable');
+  assert.match(differentArtifact.evidence, /1 license, 0 integrity/);
+  assert.equal((await check({ ...known, license: 'UNLICENSED' })).status, 'fail');
+});
+
 test('offline startup observes file rendering and Tab focus, and rejects errors or remote requests', {
   skip: !process.env.HVE_QUEST_TEST_CHROMIUM
 }, async t => {
   const { root, write } = temp(t);
   frontend(write);
+  write('app/logic/b.js', 'window.ProbeLogic = { count: () => 0 };\n');
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'fail');
   const options = { chromium: process.env.HVE_QUEST_TEST_CHROMIUM };
   const startup = await checkComposition(root, 'offline-startup', options);
   assert.equal(startup.status, 'pass', startup.evidence);

@@ -14,6 +14,74 @@ const resourceAttrs = {
   image: ['href', 'xlink:href'], use: ['href', 'xlink:href']
 };
 const installedTooling = relative => relative.split('/').some(part => part.toLowerCase() === 'node_modules');
+const browserGlobals = new Set(['window', 'globalThis', 'self']);
+const functionValue = node => ['FunctionExpression', 'ArrowFunctionExpression'].includes(node?.type);
+
+function browserReceiver(node, globals) {
+  if (node?.type === 'Identifier') return globals.has(node.name);
+  if (node?.type === 'ThisExpression') return true;
+  return node?.type === 'ConditionalExpression' &&
+    browserReceiver(node.consequent, globals) && browserReceiver(node.alternate, globals);
+}
+
+function globalProperty(node, globals) {
+  if (node?.type !== 'MemberExpression' || node.object.type !== 'Identifier' || !globals.has(node.object.name)) return;
+  const key = node.computed ? node.property.value : node.property.name;
+  return typeof key === 'string' ? key : undefined;
+}
+
+function nameAt(node, globals) {
+  if (node?.type === 'Identifier') return node.name;
+  if (node?.type !== 'MemberExpression') return;
+  return globalProperty(node, globals) ?? nameAt(node.object, globals);
+}
+
+function originOf(node, globals, bindings) {
+  if (node?.type === 'Identifier') return bindings.get(node.name);
+  if (node?.type === 'MemberExpression') return globalProperty(node, globals) ?? originOf(node.object, globals, bindings);
+  if (['CallExpression', 'NewExpression'].includes(node?.type)) return originOf(node.callee, globals, bindings);
+}
+
+function bindingNames(pattern) {
+  switch (pattern?.type) {
+    case 'Identifier': return [pattern.name];
+    case 'ObjectPattern': return pattern.properties.flatMap(property => bindingNames(property.type === 'RestElement' ? property : property.value));
+    case 'ArrayPattern': return pattern.elements.flatMap(bindingNames);
+    case 'AssignmentPattern': return bindingNames(pattern.left);
+    case 'RestElement': return bindingNames(pattern.argument);
+    default: return [];
+  }
+}
+
+function walkChildren(node, visit) {
+  for (const value of Object.values(node)) {
+    if (Array.isArray(value)) value.forEach(visit);
+    else visit(value);
+  }
+}
+
+function unstableBindings(ast) {
+  const declared = new Set();
+  const unstable = new Set();
+  const visit = node => {
+    if (!node || typeof node.type !== 'string') return;
+    if (node.type === 'VariableDeclarator') {
+      for (const name of bindingNames(node.id)) {
+        if (declared.has(name)) unstable.add(name);
+        declared.add(name);
+      }
+    }
+    if (['AssignmentExpression', 'UpdateExpression', 'ForInStatement', 'ForOfStatement'].includes(node.type)) {
+      const target = node.left ?? node.argument;
+      const names = target.type === 'VariableDeclaration'
+        ? target.declarations.flatMap(item => bindingNames(item.id)) : bindingNames(target);
+      names.forEach(name => unstable.add(name));
+    }
+    walkChildren(node, visit);
+  };
+  visit(ast);
+  return unstable;
+}
 
 function inspectFrontend(root) {
   const files = new Set();
@@ -55,15 +123,6 @@ function inspectFrontend(root) {
     }
   };
 
-  const nameAt = node => {
-    if (node?.type === 'Identifier') return node.name;
-    if (node?.type !== 'MemberExpression') return undefined;
-    const base = nameAt(node.object);
-    return ['window', 'globalThis', 'self'].includes(base)
-      ? node.computed ? node.property.value : node.property.name
-      : base;
-  };
-
   const inspectScript = (id, owner, source, module) => {
     if (scripts.has(id)) return;
     let ast;
@@ -76,26 +135,86 @@ function inspectFrontend(root) {
     const provides = new Set();
     const uses = new Set();
     const dependencies = new Set();
-    scripts.set(id, { provides, uses, module });
+    const injections = [];
+    scripts.set(id, { provides, uses, module, injections });
     edges.set(id, dependencies);
 
     for (const statement of ast.body) {
       if (statement.type === 'VariableDeclaration') {
-        for (const item of statement.declarations) provides.add(item.id.name);
+        for (const item of statement.declarations) bindingNames(item.id).forEach(name => provides.add(name));
       } else if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') {
         provides.add(statement.id?.name);
       }
     }
-    provides.delete(undefined);
-
-    const walk = node => {
+    // A classic script can publish its API through an IIFE's global-object parameter.
+    const wrappers = new Set(module ? [] : ast.body.map(statement => statement.expression)
+      .filter(node => node?.type === 'CallExpression' && functionValue(node.callee)));
+    const unstable = unstableBindings(ast);
+    const walk = (node, globals, bindings) => {
       if (!node || typeof node.type !== 'string') return;
-      if (node.type === 'CallExpression' || node.type === 'NewExpression') uses.add(nameAt(node.callee));
-      if (node.type === 'MemberExpression') uses.add(nameAt(node));
-      if (node.type === 'AssignmentExpression' && node.left.type === 'MemberExpression' &&
-          ['window', 'globalThis', 'self'].includes(node.left.object.name)) {
-        provides.add(nameAt(node.left));
+      if (node.type === 'Program' || node.type === 'BlockStatement') {
+        const scopedGlobals = new Set(globals);
+        const local = new Map(bindings);
+        for (const child of node.body) {
+          const names = child.type === 'VariableDeclaration' ? child.declarations.flatMap(item => bindingNames(item.id))
+            : ['FunctionDeclaration', 'ClassDeclaration'].includes(child.type) ? bindingNames(child.id) : [];
+          for (const name of names) {
+            scopedGlobals.delete(name);
+            local.delete(name);
+          }
+        }
+        for (const child of node.body) {
+          if (child.type === 'VariableDeclaration') {
+            for (const declaration of child.declarations) {
+              walk(declaration, scopedGlobals, local);
+              const { id: binding, init } = declaration;
+              const origin = originOf(init, scopedGlobals, local);
+              if (binding.type === 'Identifier' && origin !== undefined && !unstable.has(binding.name)) {
+                local.set(binding.name, origin);
+              }
+            }
+          } else walk(child, scopedGlobals, local);
+        }
+        return;
       }
+      if (functionValue(node) || node.type === 'FunctionDeclaration') {
+        const shadowed = new Set([...node.params.flatMap(bindingNames), ...bindingNames(node.id)]);
+        const scopedGlobals = new Set([...globals].filter(name => !shadowed.has(name)));
+        const local = new Map([...bindings].filter(([name]) => !shadowed.has(name)));
+        node.params.forEach(param => walk(param, scopedGlobals, local));
+        walk(node.body, scopedGlobals, local);
+        return;
+      }
+      if (wrappers.has(node)) {
+        node.arguments.forEach(arg => walk(arg, globals, bindings));
+        const wrappedGlobals = new Set(globals);
+        for (const name of node.callee.params.flatMap(bindingNames)) wrappedGlobals.delete(name);
+        node.callee.params.forEach((param, index) => {
+          if (param.type === 'Identifier' && !unstable.has(param.name) && browserReceiver(node.arguments[index], globals)) {
+            wrappedGlobals.add(param.name);
+          }
+        });
+        node.callee.params.forEach(param => walk(param, wrappedGlobals, bindings));
+        walk(node.callee.body, wrappedGlobals, bindings);
+        return;
+      }
+      if (node.type === 'CallExpression' || node.type === 'NewExpression') {
+        uses.add(nameAt(node.callee, globals));
+        const application = originOf(node.callee, globals, bindings);
+        if (application) {
+          for (const arg of node.arguments) {
+            const values = arg.type === 'ObjectExpression'
+              ? arg.properties.filter(property => property.type === 'Property' && property.kind === 'init').map(property => property.value)
+              : [arg];
+            for (const value of values) {
+              const data = originOf(value, globals, bindings);
+              if (data && data !== application) injections.push([application, data]);
+            }
+          }
+        }
+      }
+      if (node.type === 'MemberExpression') uses.add(nameAt(node, globals));
+      if (node.type === 'AssignmentExpression') provides.add(globalProperty(node.left, globals));
 
       if (['ImportDeclaration', 'ExportAllDeclaration', 'ExportNamedDeclaration', 'ImportExpression']
         .includes(node.type) && node.source) {
@@ -107,12 +226,9 @@ function inspectFrontend(root) {
         dependencies.add(imported);
         if (/\.[cm]?js$/i.test(imported)) inspectScript(imported, imported, readText(root, imported), true);
       }
-      for (const value of Object.values(node)) {
-        if (Array.isArray(value)) value.forEach(walk);
-        else walk(value);
-      }
+      walkChildren(node, child => walk(child, globals, bindings));
     };
-    walk(ast);
+    walk(ast, browserGlobals, new Map());
     uses.delete(undefined);
     provides.delete(undefined);
   };
@@ -165,25 +281,45 @@ function inspectFrontend(root) {
   // Classic scripts use ordered globals rather than module imports when launched over file://.
   const classic = entryScripts.filter(id => !scripts.get(id).module && !id.includes('#event-'));
   const ordered = [...classic, ...entryScripts.filter(id => id.includes('#event-'))];
+  let hasInjectedDependency = false;
   for (const [index, id] of ordered.entries()) {
-    for (const provider of classic.slice(0, index)) {
-      if (id !== provider && [...scripts.get(id).uses].some(symbol => scripts.get(provider).provides.has(symbol))) {
+    const prior = classic.slice(0, index).filter(provider => provider !== id);
+    const { uses, injections } = scripts.get(id);
+    for (const provider of prior) {
+      if ([...uses].some(symbol => scripts.get(provider).provides.has(symbol))) {
         edges.get(id).add(provider);
       }
     }
+    // Loading two scripts as siblings is insufficient: one export must be passed to the other.
+    const providerOf = name => {
+      const candidates = prior.filter(provider => !provider.includes('#') && scripts.get(provider).provides.has(name));
+      return candidates.length === 1 ? candidates[0] : undefined;
+    };
+    hasInjectedDependency ||= injections.some(([application, data]) => {
+      const logic = providerOf(application);
+      const storage = providerOf(data);
+      return logic && storage && logic !== storage;
+    });
   }
 
-  const hasThreeTiers = entryScripts.some(ui => [...edges.get(ui)].some(logic =>
+  const hasThreeTiers = hasInjectedDependency || entryScripts.some(ui => [...edges.get(ui)].some(logic =>
     !logic.includes('#') && [...(edges.get(logic) ?? [])].some(data =>
       !data.includes('#') && data !== logic && data !== ui)));
   return { resourceCount: files.size, hasThreeTiers };
 }
 
 async function observeOfflineStartup(root, executablePath) {
-  if (!executablePath) throw new CheckError('No local Chromium executable was supplied.', 'not-testable');
-  requireEvidence(path.isAbsolute(executablePath) && !/^[\\/]{2}/.test(executablePath) &&
-    fs.statSync(executablePath, { throwIfNoEntry: false })?.isFile(),
-  'Expected an absolute, local Chromium executable path.');
+  if (!executablePath) throw new CheckError('No local Chromium executable was supplied.', 'not-run');
+  if (!path.isAbsolute(executablePath) || /^[\\/]{2}/.test(executablePath) ||
+      !fs.statSync(executablePath, { throwIfNoEntry: false })?.isFile()) {
+    throw new CheckError('Expected an absolute, local Chromium executable path.', 'not-run');
+  }
+  try {
+    inspectFrontend(root);
+  } catch (error) {
+    if (!(error instanceof CheckError)) throw error;
+    throw new CheckError('Static resource checks blocked opening the page.', 'not-run');
+  }
   const { chromium } = require('playwright-core');
   const browser = await chromium.launch({ executablePath, chromiumSandbox: true, timeout: 30_000 });
   try {

@@ -38,7 +38,7 @@ After the gate, accept only `SystemName` (required), `AirlineName` (optional), `
 
 Resolve the explicit destination as a new or empty local directory outside the formula repository, not a link, junction, ambiguous path, volume root or existing work. It is a destination, never a source. Stop before writing when the name/destination is missing or unsafe. Do not overwrite or deploy.
 
-Completion requires the output contract, all twelve quest briefs, correct copied assets, discovery checks, static suite lint and an independently observed offline interaction. Structural presence is not runtime behavior. Record unavailable tools or observations as incomplete with the precise blocker, not Pass. Optional services and native HVE execution are separate, not frontend prerequisites.
+Completion requires the output contract, all twelve quest briefs, correct copied assets, discovery checks, dependency evidence, static suite lint and independently observed offline interactions. Structural presence is not runtime behavior. Record unavailable tools or observations as incomplete with the precise blocker, not Pass. Optional services and native HVE execution are separate, not frontend prerequisites.
 
 ## Build and check in phases
 
@@ -56,7 +56,9 @@ Make it an airline-specific flight, passenger and reservation workspace: flight 
 
 Include small original inert Classic ASP, VBScript, VB6/COM and T-SQL specimens and annotations that distinguish archival claims from the runnable path. Do not make a legacy executable necessary. A separate local service may illustrate open-source Mono/XSP WebForms, a .NET API, PostgreSQL and a proxy; document its optional status and the component that would own a hold.
 
-The conflict replay must execute a controlled interleaving from actual application logic or clearly say it is an illustration and point to a runnable local reproduction. Include a non-conflicting/serialized control and focused tests of the behavior learners may change. A seed or illustrative trace does not prove a historical cause, live independent-client concurrency or durable atomic storage. Have local non-model checks verify the claimed layer/feature paths before writing matching quest objectives; do not promise a search feature that does not exist.
+Before writing any quest brief, have a human or a non-model local check trace an actual flight lookup and temporary seat hold from the launched UI through the application logic to a data read or write and back to the UI. For each action, check both the visible result and the underlying data operation. Record the relative source pointers, local command or manual action, exit code when applicable, and pass, fail or not-run status in the generated README without recording story data or raw output. A static import or script link alone is not an observation. If either trace cannot be demonstrated, stop at this checkpoint and report the incomplete output rather than writing quests that depend on it.
+
+The conflict replay must execute a controlled interleaving from actual application logic or clearly say it is an illustration and point to a runnable local reproduction. Include a non-conflicting/serialized control and focused tests of the behavior learners may change. A seed or illustrative trace does not prove a historical cause, live independent-client concurrency or durable atomic storage.
 
 Invent system notes with gaps, conflicting operational perspectives from at least three distinct role categories, illustrated persona cards and a visual backlog with dependencies. Label them invented, not user research. Keep claims, observations, hypotheses and unknowns distinguishable; three names do not necessarily represent three roles.
 
@@ -81,6 +83,8 @@ Flags and recovered clues demonstrate discovery only. They are never learner com
 The copied scripts require PowerShell 7 (`pwsh`), not Windows PowerShell (`powershell`).
 
 Include a data-free Vally suite with exactly one procedural stimulus named `quest-01-...` through `quest-12-...`, each with an expectation and globally unique quest-specific grader names. No `agent_environment`, file staging, source records or examples; do not copy the maintainer suite. Declare the actual CLI package `@microsoft/vally-cli` at a verified version with its lockfile, not the unrelated `vally` package. Local package commands cover readiness and static lint only; expose no live model evaluation command.
+
+Verify license and integrity evidence separately for resolved dependencies, including transitive tooling, and retain applicable third-party notices for vendored assets. Use trusted package metadata or license notices for license evidence, and a SHA-256 or stronger digest for integrity. If the lockfile lacks either or has only SHA-1, record independent evidence from a trusted source tied to the same package, exact version and artifact. Leave unresolved entries incomplete; do not fill the lockfile with guessed values or treat a license declaration as proof of package integrity.
 
 Use `pwsh -NoProfile -File scripts/Test-QuestReadiness.ps1 -OutputPath <output-root>` and `vally lint --eval-spec evals/` through the documented local package commands. Require static lint before claiming completion: merely counting twelve names cannot detect duplicate grader IDs or validate a suite. Restore declared dependencies locally if needed; they are development tooling, never frontend requirements. If prerequisites are unavailable, report static lint not run and output incomplete.
 

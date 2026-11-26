@@ -81,7 +81,7 @@ stimuli:
           args: [-e, *dispatch, composition, offline-startup]
   - name: generated-dependency-evidence
     supported_executors: *offline
-    prompt: Audit declarations and resolved lock entries for open license evidence.
+    prompt: Check resolved packages for open-license and strong integrity metadata, and report gaps separately.
     graders:
       - type: program
         name: generated-locked-license-evidence
