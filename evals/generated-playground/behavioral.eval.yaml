@@ -32,7 +32,9 @@ stimuli:
         A locator is output-relative with a one-based line number. Cite app/web/index.html for launch.
         For discovery, use path and line locators and do not repeat clue values or workshop records.
         Do not say a native action, human decision, or runtime observation happened unless it did.
-        Use locally available procedures only where applicable. Do not mutate external services or deploy.
+        Use locally available procedures only where applicable. Do not install, publish or mutate external services.
+        Leave application source unchanged through Quest 11. Never change the workshop briefs, discovery files,
+        bundled checkers, scoped instructions, provenance inventory, interface capture, package files or eval specs.
         Finish this turn before starting the next; do not write future quest artifacts early.
         Outcomes: launch, offline-boundary, verified-behavior.
       - |
@@ -125,6 +127,11 @@ stimuli:
         turn: 0
         config:
           pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/01\.md b/\.hve-walkthrough/01\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/01\.json b/\.hve-walkthrough/01\.json\r?\nnew file mode [0-7]{6}\r?$)'
+      - type: diff-not-contains
+        name: generated-quest-01-preserves-input
+        turn: 0
+        config: &assessment
+          pattern: '(?im)^diff --git (?:[^\r\n]+ )?"?[ab]/(?:(?:app|quests|evals|\.github/instructions)/|(?:package(?:-lock)?\.json|docs/(?:workshop-data\.json|images/eagledesk\.png)|scripts/(?:Test-Quest(?:Readiness|Flag)\.ps1|LICENSE))"?(?: |\r?$))'
       - type: program
         name: generated-quest-02-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "02"] }
@@ -133,6 +140,10 @@ stimuli:
         turn: 1
         config:
           pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/02\.md b/\.hve-walkthrough/02\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/02\.json b/\.hve-walkthrough/02\.json\r?\nnew file mode [0-7]{6}\r?$)'
+      - type: diff-not-contains
+        name: generated-quest-02-preserves-input
+        turn: 1
+        config: *assessment
       - type: program
         name: generated-quest-03-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "03"] }
@@ -141,6 +152,10 @@ stimuli:
         turn: 2
         config:
           pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/03\.md b/\.hve-walkthrough/03\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/03\.json b/\.hve-walkthrough/03\.json\r?\nnew file mode [0-7]{6}\r?$)'
+      - type: diff-not-contains
+        name: generated-quest-03-preserves-input
+        turn: 2
+        config: *assessment
       - type: program
         name: generated-quest-04-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "04"] }
@@ -149,6 +164,10 @@ stimuli:
         turn: 3
         config:
           pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/04\.md b/\.hve-walkthrough/04\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/04\.json b/\.hve-walkthrough/04\.json\r?\nnew file mode [0-7]{6}\r?$)'
+      - type: diff-not-contains
+        name: generated-quest-04-preserves-input
+        turn: 3
+        config: *assessment
       - type: program
         name: generated-quest-05-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "05"] }
@@ -157,6 +176,10 @@ stimuli:
         turn: 4
         config:
           pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/05\.md b/\.hve-walkthrough/05\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/05\.json b/\.hve-walkthrough/05\.json\r?\nnew file mode [0-7]{6}\r?$)'
+      - type: diff-not-contains
+        name: generated-quest-05-preserves-input
+        turn: 4
+        config: *assessment
       - type: program
         name: generated-quest-06-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "06"] }
@@ -165,6 +188,10 @@ stimuli:
         turn: 5
         config:
           pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/06\.md b/\.hve-walkthrough/06\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/06\.json b/\.hve-walkthrough/06\.json\r?\nnew file mode [0-7]{6}\r?$)'
+      - type: diff-not-contains
+        name: generated-quest-06-preserves-input
+        turn: 5
+        config: *assessment
       - type: program
         name: generated-quest-07-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "07"] }
@@ -173,6 +200,10 @@ stimuli:
         turn: 6
         config:
           pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/07\.md b/\.hve-walkthrough/07\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/07\.json b/\.hve-walkthrough/07\.json\r?\nnew file mode [0-7]{6}\r?$)'
+      - type: diff-not-contains
+        name: generated-quest-07-preserves-input
+        turn: 6
+        config: *assessment
       - type: program
         name: generated-quest-08-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "08"] }
@@ -181,6 +212,10 @@ stimuli:
         turn: 7
         config:
           pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/08\.md b/\.hve-walkthrough/08\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/08\.json b/\.hve-walkthrough/08\.json\r?\nnew file mode [0-7]{6}\r?$)'
+      - type: diff-not-contains
+        name: generated-quest-08-preserves-input
+        turn: 7
+        config: *assessment
       - type: program
         name: generated-quest-09-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "09"] }
@@ -189,6 +224,10 @@ stimuli:
         turn: 8
         config:
           pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/09\.md b/\.hve-walkthrough/09\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/09\.json b/\.hve-walkthrough/09\.json\r?\nnew file mode [0-7]{6}\r?$)'
+      - type: diff-not-contains
+        name: generated-quest-09-preserves-input
+        turn: 8
+        config: *assessment
       - type: program
         name: generated-quest-10-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "10"] }
@@ -197,6 +236,10 @@ stimuli:
         turn: 9
         config:
           pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/10\.md b/\.hve-walkthrough/10\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/10\.json b/\.hve-walkthrough/10\.json\r?\nnew file mode [0-7]{6}\r?$)'
+      - type: diff-not-contains
+        name: generated-quest-10-preserves-input
+        turn: 9
+        config: *assessment
       - type: program
         name: generated-quest-11-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "11"] }
@@ -205,6 +248,10 @@ stimuli:
         turn: 10
         config:
           pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/11\.md b/\.hve-walkthrough/11\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/11\.json b/\.hve-walkthrough/11\.json\r?\nnew file mode [0-7]{6}\r?$)'
+      - type: diff-not-contains
+        name: generated-quest-11-preserves-input
+        turn: 10
+        config: *assessment
       - type: program
         name: generated-quest-12-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "12"] }
@@ -218,3 +265,8 @@ stimuli:
         turn: 11
         config:
           pattern: '(?m)^diff --git ("?)a/(app/[^\r\n]+?\.(?:html|css|[cm]?js))\1 \1b/\2\1\r?\n(?:new file mode [0-7]{6}\r?\n)?index [a-f0-9]+\.\.[a-f0-9]+(?: [0-7]{6})?\r?\n--- (?:/dev/null|\1a/\2\1)[ \t]*\r?\n\+\+\+ \1b/\2\1[ \t]*\r?$'
+      - type: diff-not-contains
+        name: generated-quest-12-preserves-input
+        turn: 11
+        config:
+          pattern: '(?im)^diff --git (?:[^\r\n]+ )?"?[ab]/(?:(?:quests|evals|\.github/instructions)/|(?:package(?:-lock)?\.json|docs/(?:workshop-data\.json|images/eagledesk\.png)|scripts/(?:Test-Quest(?:Readiness|Flag)\.ps1|LICENSE))"?(?: |\r?$))'

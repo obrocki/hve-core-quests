@@ -216,6 +216,9 @@ async function observeOfflineStartup(root, executablePath) {
     const page = await context.newPage();
     page.on('requestfailed', () => failures++);
     page.on('pageerror', () => failures++);
+    page.on('console', message => {
+      if (message.type() === 'error') failures++;
+    });
     page.on('requestfinished', request => {
       if (request.resourceType() === 'script' && request.url().startsWith('file:')) scripts++;
     });
@@ -225,7 +228,13 @@ async function observeOfflineStartup(root, executablePath) {
       body.getBoundingClientRect().height > 0 && body.innerText.trim().length > 0);
     requireEvidence(page.url() === url && visible && scripts > 0 && denied === 0 && failures === 0,
       'Offline startup did not produce a visible page and loaded local scripts without runtime or request failures.');
-    return 'A fresh offline Chromium context loaded the file URL and local scripts with no observed startup errors.';
+    await page.keyboard.press('Tab');
+    const focusable = await page.locator(':focus').evaluateAll(elements => elements.some(element =>
+      element !== document.body && element !== document.documentElement && element.getClientRects().length > 0 &&
+      getComputedStyle(element).visibility === 'visible'));
+    requireEvidence(focusable, 'Tab did not reach a visible focus target in the offline frontend.');
+    requireEvidence(denied === 0 && failures === 0, 'Keyboard startup produced runtime or request failures.');
+    return 'Offline Chromium loaded the file URL and local scripts, and Tab reached a visible focus target without observed startup errors.';
   } finally {
     await browser.close();
   }

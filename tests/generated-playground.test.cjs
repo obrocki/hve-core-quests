@@ -28,7 +28,7 @@ function temp(t) {
   return { root, write };
 }
 
-const page = '<!doctype html><html><body><main></main>' +
+const page = '<!doctype html><html><body><main></main><button type="button">Probe</button>' +
   '<script src="../store/a.js"></script><script src="../logic/b.js"></script><script src="c.js"></script></body></html>';
 
 function frontend(write) {
@@ -175,7 +175,7 @@ test('composition distinguishes wrong evidence from incomplete licensing and pro
   assert.match((await checkComposition(root, 'clue-discovery')).evidence, /duplicate or ambiguous JSON/);
 });
 
-test('offline startup observes file rendering and rejects script errors and attempted remote requests', {
+test('offline startup observes file rendering and Tab focus, and rejects errors or remote requests', {
   skip: !process.env.HVE_QUEST_TEST_CHROMIUM
 }, async t => {
   const { root, write } = temp(t);
@@ -183,6 +183,9 @@ test('offline startup observes file rendering and rejects script errors and atte
   const options = { chromium: process.env.HVE_QUEST_TEST_CHROMIUM };
   const startup = await checkComposition(root, 'offline-startup', options);
   assert.equal(startup.status, 'pass', startup.evidence);
+  write('app/web/index.html', page.replace('type="button"', 'type="button" tabindex="-1"'));
+  assert.match((await checkComposition(root, 'offline-startup', options)).evidence, /Tab did not reach/);
+  write('app/web/index.html', page);
   write('app/web/c.js', 'ProbeLogic.count(); throw new Error("Startup probe");\n');
   assert.equal((await checkComposition(root, 'offline-startup', options)).status, 'fail');
   write('app/web/c.js', `document.querySelector('main').textContent = String(ProbeLogic.count());
@@ -328,7 +331,7 @@ test('installed Vally diff graders accept creation headers, not echo, denial or 
     assert.equal(await check(stimulus.turns[index]), false, id);
     assert.equal(await check('The required workspace is unavailable.'), false, id);
   }
-  const appGrade = stimulus.graders.at(-1);
+  const appGrade = stimulus.graders.find(item => item.name === 'generated-quest-12-application-change');
   const checkChange = async diff => (await grader.grade({ trajectory: { diff }, config: appGrade.config })).passed;
   assert.equal(await checkChange(appPatch), true);
   const withSpaces = appPatch.replaceAll('app/web/c.js', 'app/web/c page.js')
@@ -337,8 +340,21 @@ test('installed Vally diff graders accept creation headers, not echo, denial or 
   assert.equal(await checkChange(additions('12')), false);
   assert.equal(await checkChange('--- a/app/web/c.js\n+++ b/app/web/c.js\n'), false);
   assert.equal(await checkChange(appPatch.replace('+++ b/app/web/c.js', '+++ /dev/null')), false);
+  const preserve = createDefaultGraderRegistry().get('diff-not-contains');
+  const safety = async (id, diff) => {
+    const { config } = stimulus.graders.find(item => item.name === `generated-quest-${id}-preserves-input`);
+    return (await preserve.grade({ trajectory: { diff }, config })).passed;
+  };
+  for (const id of questIds) {
+    assert.equal(await safety(id, additions(id)), true, id);
+    assert.equal(await safety(id, appPatch), id === '12', id);
+    assert.equal(await safety(id, 'diff --git a/scripts/Test-QuestFlag.ps1 b/renamed.ps1\n'), false, id);
+    assert.equal(await safety(id, 'diff --git a/previous.md b/quests/copy.md\n'), false, id);
+    assert.equal(await safety(id, 'diff --git a/package.json b/package.json\n'), false, id);
+    assert.equal(await safety(id, 'diff --git a/package.json.bak b/package.json.bak\n'), true, id);
+  }
 
-  const graders = stimulus.graders.filter(candidate => candidate.type === 'diff-contains');
+  const graders = stimulus.graders.filter(candidate => candidate.type.startsWith('diff-'));
   const turnDiffs = questIds.map((id, turn) => ({ turn, diff: additions(id) }));
   turnDiffs.at(-1).diff += appPatch;
   const trajectory = {
@@ -425,7 +441,7 @@ test('Vally captures and grades all twelve mock turn diffs, but rejects a mock e
     questIds.map((_, turn) => [turn, 'string']));
   const grade = await score(run.trajectory);
   assert.equal(grade.passed, true, `${grade.evidence}: ${grade.details.filter(detail => !detail.passed).map(d => d.evidence)}`);
-  assert.equal(grade.details.filter(detail => detail.passed).length, 25);
+  assert.equal(grade.details.filter(detail => detail.passed).length, 37);
   assert.equal(grade.details.filter(detail => detail.graderType === 'program').every(detail =>
     detail.metadata.native === 'not-testable' && detail.metadata.semantic === 'uncalibrated'), true);
 });
@@ -463,7 +479,7 @@ test('suite specs contain no staged material and dedupe all prompt and turn text
     assert.deepEqual(definition.defaults, { executor: 'mock', runs: 1 });
     for (const stimulus of definition.stimuli) {
       assert.deepEqual(stimulus.supported_executors, ['mock']);
-      assert.ok(stimulus.graders.every(grader => ['program', 'diff-contains'].includes(grader.type)));
+      assert.ok(stimulus.graders.every(grader => ['program', 'diff-contains', 'diff-not-contains'].includes(grader.type)));
     }
   }
   const names = new Set();
