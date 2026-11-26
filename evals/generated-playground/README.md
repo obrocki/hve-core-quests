@@ -34,6 +34,8 @@ The Vally program graders resolve the trusted author checker from the absolute `
 
 ## Requested family profiles
 
+The [HVE coverage matrix and operator runbook](hve-live-lane.md) map the twelve quests to HVE Core 3.2.2 and document the separate offline native-trace grader. No live executor is enabled.
+
 This is assignment metadata, not executable provider configuration, an effective routing record, or authorization. The same local tooling applies to every family.
 
 | Family | Requested generation profile | Requested test profile |

@@ -4,6 +4,11 @@ const { checkComposition, compositionChecks, questIds } = require('./composition
 const { checkBehavior } = require('./behavior.cjs');
 
 async function runVally([kind, check]) {
+  if (kind === 'native') {
+    const { nativeVally } = require('./live-lane.cjs');
+    console.log(JSON.stringify(nativeVally(check, process.env)));
+    return;
+  }
   const result = kind === 'composition'
     ? await checkComposition(process.env.HVE_QUEST_PLAYGROUND, check, { chromium: process.env.HVE_QUEST_CHROMIUM })
     : kind === 'behavior' ? checkBehavior(process.env.EVALUATE_WORKSPACE, check)

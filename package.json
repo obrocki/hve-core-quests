@@ -8,8 +8,10 @@
     "eval": "node scripts/eval-preflight.cjs",
     "eval:composition": "node evals/generated-playground/program.cjs composition",
     "eval:evidence": "node evals/generated-playground/program.cjs evidence",
-    "test:generated": "node --test tests/generated-playground.test.cjs",
-    "test": "node --test tests/workshop-safeguards.test.cjs tests/generated-playground.test.cjs"
+    "live:preflight": "node evals/generated-playground/live-lane.cjs preflight",
+    "live:grade": "node evals/generated-playground/live-lane.cjs grade",
+    "test:generated": "node --test tests/generated-playground.test.cjs tests/hve-live-lane.test.cjs",
+    "test": "node --test tests/*.test.cjs"
   },
   "devDependencies": {
     "@microsoft/vally": "0.20.0",
