@@ -4,7 +4,7 @@ This repository contains **workshop instructions**, not a sample dataset or a ru
 
 ## Start here: instruction-only workshop
 
-No model, sign-in, installation, or sample data is needed. Read the [quest sequence](.github/skills/legacy-quest-formula/references/quest-design.md) in order. Start with **01 Documentation**: draw the boundary between the offline frontend and an optional service, then write a launch note that explains what does *not* need to be running. For later quests, work from the objectives: sketch a research plan, identify assumptions, or draft acceptance criteria. Mark missing observations as unknown rather than inventing evidence. See the [practice map](.github/skills/legacy-quest-formula/references/hve-core-map.md) for corresponding HVE Core activities.
+No model, sign-in, installation, or sample data is needed. Read the [quest sequence and HVE practice map](.github/skills/legacy-quest-formula/SKILL.md#twelve-quest-sequence) in order. Start with **01 Documentation**: draw the boundary between the offline frontend and an optional service, then write a launch note that explains what does *not* need to be running. For later quests, work from the objectives: sketch a research plan, identify assumptions, or draft acceptance criteria. Mark missing observations as unknown rather than inventing evidence.
 
 | Quest | Practice | Instruction-only activity |
 |---|---|---|
@@ -32,13 +32,29 @@ Before opening a model session, consult your organization's accountable owner an
 
 ```mermaid
 flowchart LR
-    Browser["Presentation: local HTML, CSS and JS"] --> Storage["Offline browser storage"]
+    Browser["Presentation: local HTML, CSS and JS"] --> Logic["Local application logic"]
+    Logic --> Storage["Offline browser storage"]
     Browser -. optional local API .-> Service["Application service"]
     Service --> DB["Data store"]
     Archive["Inert historical sources"] -. for inspection only .-> Service
 ```
 
-The [domain brief](.github/skills/legacy-quest-formula/references/domain-pack.md) describes the retro interface and layers. See the [output layout](.github/skills/legacy-quest-formula/references/output-layout.md) for paths, screenshot and provenance requirements. The [safety notes](.github/skills/legacy-quest-formula/SECURITY.md) distinguish local creation, evaluation, cross-team reuse and external distribution. Obtain a separate decision and agreed disclosure for any sample distribution **before** sharing, including a public commit. A fictional-use label is not release approval.
+The [source and interface contract](.github/skills/legacy-quest-formula/SKILL.md#checkpoint-2-executable-source-and-truthful-evidence) describes the battleship-gray Windows 95 airline business app: dense panes, inset fields and beveled controls, without an imitation Start button or taskbar. See the [output contract](.github/skills/legacy-quest-formula/SKILL.md#output-contract) for paths, actual screenshots and provenance requirements. The [safety gate](.github/skills/legacy-quest-formula/SKILL.md#safety-gate) distinguishes local creation, evaluation, cross-team reuse and external distribution. Obtain a separate decision and agreed disclosure for any sample distribution **before** sharing, including a public commit. A fictional-use label is not release approval.
+
+## Customer pack and author workbench
+
+Copy only `.github/skills/legacy-quest-formula/` into a clean eligible workspace. Its complete distributable is **four files**:
+
+| File in the skill folder | Purpose |
+|---|---|
+| `SKILL.md` | Self-contained generation prompt, safeguards, output contract and twelve quests. |
+| `scripts/Test-QuestReadiness.ps1` | Deterministic local structural check, copied unchanged into the new output. |
+| `scripts/Test-QuestFlag.ps1` | Deterministic discovery check, copied unchanged into the new output. |
+| `LICENSE` | MIT notice copied with the checkers. |
+
+The scripts avoid generating different validation rules for every customer; there is no reference app or sample data to install. The generated repository will have its own app, docs, quests and local checks, created in the separate destination. Those output files are not part of the distributed pack.
+
+Everything outside the skill folder is repository metadata, documentation or the **author-only workbench**. Customers do not need root `package.json`/lockfile, `tests/`, `scripts/eval-preflight.cjs`, `evals/` or author evidence to generate the exercise. The generation procedure must not consult those files as examples.
 
 ## Maintainer checks
 
@@ -60,6 +76,8 @@ pwsh .github/skills/legacy-quest-formula/scripts/Test-QuestReadiness.ps1 -Output
 pwsh .github/skills/legacy-quest-formula/scripts/Test-QuestFlag.ps1 -OutputPath $out -Quest 1 -Flag '<local-clue-value>'
 ```
 
-[Readiness and learner evidence](.github/skills/legacy-quest-formula/references/readiness-and-evidence.md) explains what these results mean. Missing provenance in an older output means origin unknown; do not reconstruct it to make a check pass.
+The [validation checkpoint](.github/skills/legacy-quest-formula/SKILL.md#checkpoint-4-static-validation-and-offline-observation) explains what these results mean. Missing provenance in an older output means origin unknown; do not reconstruct it to make a check pass.
+
+Author regressions check the exact four-file boundary, self-contained links, retained safety/quest contracts, unique static grader names and checker behavior from an isolated pack. They do not prove that a new generation obeys the prompt. Historical suites that failed before executing probes provide no model-quality score. Matched fresh-generation comparisons and native HVE walkthroughs need independently verified clean context and an approved use/route; the current live-evaluation entry remains disabled. Report artifact results, native workflow status, human approvals and runtime observations separately rather than claiming the checks guarantee a completed HVE lifecycle.
 
 The [MIT license](LICENSE) covers this software. Earlier versions credited 98.css (MIT) and FontStruction fonts by lou (CC BY-SA 3.0); those assets are not included in this instruction tree. Retain applicable third-party notices in any output that uses the corresponding components.
