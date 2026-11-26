@@ -124,7 +124,7 @@ stimuli:
         name: generated-quest-01-turn-creation
         turn: 0
         config:
-          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/01\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/01\.json\r?$)'
+          pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/01\.md b/\.hve-walkthrough/01\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/01\.json b/\.hve-walkthrough/01\.json\r?\nnew file mode [0-7]{6}\r?$)'
       - type: program
         name: generated-quest-02-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "02"] }
@@ -132,7 +132,7 @@ stimuli:
         name: generated-quest-02-turn-creation
         turn: 1
         config:
-          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/02\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/02\.json\r?$)'
+          pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/02\.md b/\.hve-walkthrough/02\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/02\.json b/\.hve-walkthrough/02\.json\r?\nnew file mode [0-7]{6}\r?$)'
       - type: program
         name: generated-quest-03-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "03"] }
@@ -140,7 +140,7 @@ stimuli:
         name: generated-quest-03-turn-creation
         turn: 2
         config:
-          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/03\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/03\.json\r?$)'
+          pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/03\.md b/\.hve-walkthrough/03\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/03\.json b/\.hve-walkthrough/03\.json\r?\nnew file mode [0-7]{6}\r?$)'
       - type: program
         name: generated-quest-04-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "04"] }
@@ -148,7 +148,7 @@ stimuli:
         name: generated-quest-04-turn-creation
         turn: 3
         config:
-          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/04\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/04\.json\r?$)'
+          pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/04\.md b/\.hve-walkthrough/04\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/04\.json b/\.hve-walkthrough/04\.json\r?\nnew file mode [0-7]{6}\r?$)'
       - type: program
         name: generated-quest-05-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "05"] }
@@ -156,7 +156,7 @@ stimuli:
         name: generated-quest-05-turn-creation
         turn: 4
         config:
-          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/05\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/05\.json\r?$)'
+          pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/05\.md b/\.hve-walkthrough/05\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/05\.json b/\.hve-walkthrough/05\.json\r?\nnew file mode [0-7]{6}\r?$)'
       - type: program
         name: generated-quest-06-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "06"] }
@@ -164,7 +164,7 @@ stimuli:
         name: generated-quest-06-turn-creation
         turn: 5
         config:
-          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/06\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/06\.json\r?$)'
+          pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/06\.md b/\.hve-walkthrough/06\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/06\.json b/\.hve-walkthrough/06\.json\r?\nnew file mode [0-7]{6}\r?$)'
       - type: program
         name: generated-quest-07-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "07"] }
@@ -172,7 +172,7 @@ stimuli:
         name: generated-quest-07-turn-creation
         turn: 6
         config:
-          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/07\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/07\.json\r?$)'
+          pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/07\.md b/\.hve-walkthrough/07\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/07\.json b/\.hve-walkthrough/07\.json\r?\nnew file mode [0-7]{6}\r?$)'
       - type: program
         name: generated-quest-08-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "08"] }
@@ -180,7 +180,7 @@ stimuli:
         name: generated-quest-08-turn-creation
         turn: 7
         config:
-          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/08\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/08\.json\r?$)'
+          pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/08\.md b/\.hve-walkthrough/08\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/08\.json b/\.hve-walkthrough/08\.json\r?\nnew file mode [0-7]{6}\r?$)'
       - type: program
         name: generated-quest-09-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "09"] }
@@ -188,7 +188,7 @@ stimuli:
         name: generated-quest-09-turn-creation
         turn: 8
         config:
-          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/09\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/09\.json\r?$)'
+          pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/09\.md b/\.hve-walkthrough/09\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/09\.json b/\.hve-walkthrough/09\.json\r?\nnew file mode [0-7]{6}\r?$)'
       - type: program
         name: generated-quest-10-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "10"] }
@@ -196,7 +196,7 @@ stimuli:
         name: generated-quest-10-turn-creation
         turn: 9
         config:
-          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/10\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/10\.json\r?$)'
+          pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/10\.md b/\.hve-walkthrough/10\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/10\.json b/\.hve-walkthrough/10\.json\r?\nnew file mode [0-7]{6}\r?$)'
       - type: program
         name: generated-quest-11-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "11"] }
@@ -204,7 +204,7 @@ stimuli:
         name: generated-quest-11-turn-creation
         turn: 10
         config:
-          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/11\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/11\.json\r?$)'
+          pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/11\.md b/\.hve-walkthrough/11\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/11\.json b/\.hve-walkthrough/11\.json\r?\nnew file mode [0-7]{6}\r?$)'
       - type: program
         name: generated-quest-12-artifact
         config: { program: node, args: [-e, *dispatch, behavior, "12"] }
@@ -212,9 +212,9 @@ stimuli:
         name: generated-quest-12-turn-creation
         turn: 11
         config:
-          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/12\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/12\.json\r?$)'
+          pattern: '(?m)(?<![\s\S])(?=[\s\S]*^diff --git a/\.hve-walkthrough/12\.md b/\.hve-walkthrough/12\.md\r?\nnew file mode [0-7]{6}\r?$)(?=[\s\S]*^diff --git a/\.hve-walkthrough/12\.json b/\.hve-walkthrough/12\.json\r?\nnew file mode [0-7]{6}\r?$)'
       - type: diff-contains
         name: generated-quest-12-application-change
         turn: 11
         config:
-          pattern: '(?m)^\+\+\+ b/app/[^\r\n]+\.(?:html|css|[cm]?js)\r?$'
+          pattern: '(?m)^diff --git ("?)a/(app/[^\r\n]+?\.(?:html|css|[cm]?js))\1 \1b/\2\1\r?\n(?:new file mode [0-7]{6}\r?\n)?index [a-f0-9]+\.\.[a-f0-9]+(?: [0-7]{6})?\r?\n--- (?:/dev/null|\1a/\2\1)[ \t]*\r?\n\+\+\+ \1b/\2\1[ \t]*\r?$'

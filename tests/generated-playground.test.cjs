@@ -300,9 +300,14 @@ function withAuthorPath(grader, env = {}) {
   return { ...grader, config: { ...grader.config, env: { HVE_QUEST_AUTHOR_CHECKER: checker, ...env } } };
 }
 
-function additions(id, ending = '\n') {
-  return ['md', 'json'].map(ext => `--- /dev/null${ending}+++ b/.hve-walkthrough/${id}.${ext}${ending}`).join('');
+function additions(id) {
+  return ['md', 'json'].map(ext => {
+    const file = `.hve-walkthrough/${id}.${ext}`;
+    return `diff --git a/${file} b/${file}\nnew file mode 100644\nindex 0000000..abcdef0\n--- /dev/null\n+++ b/${file}\n`;
+  }).join('');
 }
+
+const appPatch = 'diff --git a/app/web/c.js b/app/web/c.js\nindex abcdef0..abcdef1 100644\n--- a/app/web/c.js\n+++ b/app/web/c.js\n';
 
 test('installed Vally diff graders accept creation headers, not echo, denial or wrong-turn evidence', async () => {
   const { createDefaultGraderRegistry, gradeTrajectory } = await import('@microsoft/vally');
@@ -312,25 +317,30 @@ test('installed Vally diff graders accept creation headers, not echo, denial or 
     const { config, turn } = stimulus.graders.find(candidate => candidate.name === `generated-quest-${id}-turn-creation`);
     assert.equal(turn, index);
     const previous = questIds[(index + 11) % 12];
-    const [markdown, receipt] = additions(id).trimEnd().split(/(?=^---)/m);
+    const [markdown, receipt] = additions(id).trimEnd().split(/(?=^diff --git)/m);
     const check = async diff => (await grader.grade({ trajectory: { diff }, config })).passed;
     assert.equal(await check(additions(id)), true, id);
     assert.equal(await check(receipt + '\n' + markdown.replaceAll('\n', '\r\n')), true, id);
     assert.equal(await check(additions(previous)), false, id);
-    assert.equal(await check(additions(id).replaceAll('/dev/null', `a/.hve-walkthrough/${id}.json`)), false, id);
+    assert.equal(await check(additions(id).replace(/^new file mode .*\n/gm, '')), false, id);
+    assert.equal(await check(additions(id).replace(/^(?:diff --git|new file mode|index) .*\n/gm, '')), false, id);
     assert.equal(await check(markdown), false, id);
     assert.equal(await check(stimulus.turns[index]), false, id);
     assert.equal(await check('The required workspace is unavailable.'), false, id);
   }
   const appGrade = stimulus.graders.at(-1);
   const checkChange = async diff => (await grader.grade({ trajectory: { diff }, config: appGrade.config })).passed;
-  assert.equal(await checkChange('--- a/app/web/c.js\n+++ b/app/web/c.js\n'), true);
+  assert.equal(await checkChange(appPatch), true);
+  const withSpaces = appPatch.replaceAll('app/web/c.js', 'app/web/c page.js')
+    .replace(/^(?:---|\+\+\+) .*c page\.js$/gm, '$&\t');
+  assert.equal(await checkChange(withSpaces), true);
   assert.equal(await checkChange(additions('12')), false);
-  assert.equal(await checkChange('--- a/app/web/c.js\n+++ /dev/null\n'), false);
+  assert.equal(await checkChange('--- a/app/web/c.js\n+++ b/app/web/c.js\n'), false);
+  assert.equal(await checkChange(appPatch.replace('+++ b/app/web/c.js', '+++ /dev/null')), false);
 
   const graders = stimulus.graders.filter(candidate => candidate.type === 'diff-contains');
   const turnDiffs = questIds.map((id, turn) => ({ turn, diff: additions(id) }));
-  turnDiffs.at(-1).diff += '--- a/app/web/c.js\n+++ b/app/web/c.js\n';
+  turnDiffs.at(-1).diff += appPatch;
   const trajectory = {
     id: 'offline-order-probe', stimulus, events: [], output: '',
     turnDiffs, diff: turnDiffs.map(record => record.diff).join('')
