@@ -6,6 +6,7 @@ defaults:
   runs: 1
 stimuli:
   - name: generated-structural-readiness
+    supported_executors: &offline [mock]
     prompt: Inspect the local output for its required workshop structure and procedural suite.
     graders:
       - type: program
@@ -24,6 +25,7 @@ stimuli:
             - composition
             - readiness
   - name: generated-pack-integrity
+    supported_executors: *offline
     prompt: Compare the installed checkers and license to their bundled originals.
     graders:
       - type: program
@@ -32,6 +34,7 @@ stimuli:
           program: node
           args: [-e, *dispatch, composition, pack-integrity]
   - name: generated-quest-briefs
+    supported_executors: *offline
     prompt: Verify each numbered quest has its own nonempty local brief.
     graders:
       - type: program
@@ -40,6 +43,7 @@ stimuli:
           program: node
           args: [-e, *dispatch, composition, quest-briefs]
   - name: generated-png-container
+    supported_executors: *offline
     prompt: Check the expected local capture for an intact PNG container without interpreting its pixels.
     graders:
       - type: program
@@ -48,6 +52,7 @@ stimuli:
           program: node
           args: [-e, *dispatch, composition, capture-container]
   - name: generated-procedural-contract
+    supported_executors: *offline
     prompt: Validate the generated twelve-quest procedural spec without loading or executing an agent.
     graders:
       - type: program
@@ -56,6 +61,7 @@ stimuli:
           program: node
           args: [-e, *dispatch, composition, procedural-suite]
   - name: generated-three-tier-wiring
+    supported_executors: *offline
     prompt: Find a connected local resource path from the frontend to logic to storage.
     graders:
       - type: program
@@ -64,6 +70,7 @@ stimuli:
           program: node
           args: [-e, *dispatch, composition, tier-wiring]
   - name: generated-offline-startup
+    supported_executors: *offline
     prompt: Observe startup of the file URL in a fresh offline browser context.
     graders:
       - type: program
@@ -73,6 +80,7 @@ stimuli:
           timeout: 90s
           args: [-e, *dispatch, composition, offline-startup]
   - name: generated-dependency-evidence
+    supported_executors: *offline
     prompt: Audit declarations and resolved lock entries for open license evidence.
     graders:
       - type: program
@@ -81,6 +89,7 @@ stimuli:
           program: node
           args: [-e, *dispatch, composition, dependency-evidence]
   - name: generated-clue-discovery
+    supported_executors: *offline
     prompt: Validate the marker manifest and run the trusted flag checker for each quest.
     graders:
       - type: program
@@ -90,6 +99,7 @@ stimuli:
           timeout: 3m
           args: [-e, *dispatch, composition, clue-discovery]
   - name: generated-unseeded-inventory
+    supported_executors: *offline
     prompt: Review local declaration and scope coverage without asserting clearance or origin.
     graders:
       - type: program

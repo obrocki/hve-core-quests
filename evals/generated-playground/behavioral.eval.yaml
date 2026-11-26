@@ -2,12 +2,13 @@ name: generated-playground-behavior
 description: Unstaged, blocked live walkthrough contract with twelve ordered turns and deterministic evidence-shape grading.
 type: capability
 defaults:
+  executor: mock
   runs: 1
 scoring:
   threshold: 1
 stimuli:
   - name: generated-workshop-walkthrough
-    supported_executors: [copilot-sdk]
+    supported_executors: [mock]
     tags:
       advisory: "true"
       execution: blocked

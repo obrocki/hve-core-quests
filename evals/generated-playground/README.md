@@ -20,7 +20,7 @@ For the browser case only, set `HVE_QUEST_CHROMIUM` to an absolute path to a tru
 
 ## Walkthrough contract
 
-The [behavioral spec](behavioral.eval.yaml) defines one continuous 12-turn walkthrough, starting with Documentation. The formula supplies no path to stage generated material in a model evaluation. Keep this contract data-free and don't run it through a live executor. No model is configured by the suite; a selector would not verify the effective provider, route or fallback.
+The [behavioral spec](behavioral.eval.yaml) defines one continuous 12-turn walkthrough, starting with Documentation. The formula supplies no path to stage generated material in a model evaluation. The spec only allows the mock executor and configures no model. A model selector would not verify the effective provider, route or fallback.
 
 Each quest has a turn-scoped diff assertion for newly written Markdown and JSON, plus a check on the artifact digest, predecessor and cited line locations. Quest 12 also requires an application change in its own turn. Quest 07 and Quest 12 require distinguishable control and regression records, respectively. Gate claims must refer to a nonempty local file with a matching digest. A digest detects stale file references, not fabrication. These are checks on observable files and structured claims, not proof that a reported command, approval or HVE tool invocation happened. Native invocation, human decisions and runtime observation each remain `not-testable` by the artifact grader; semantic quality remains `uncalibrated`.
 

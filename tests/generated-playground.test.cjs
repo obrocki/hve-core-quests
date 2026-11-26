@@ -393,6 +393,13 @@ test('suite specs contain no staged material and dedupe all prompt and turn text
   const behavior = spec('behavioral');
   assert.deepEqual(composition.stimuli.map(stimulus => stimulus.graders[0].config.args.at(-1)), compositionChecks);
   assert.deepEqual(behavior.stimuli[0].turns.map(turn => /^Quest (\d\d),/.exec(turn)?.[1]), questIds);
+  for (const definition of [composition, behavior]) {
+    assert.deepEqual(definition.defaults, { executor: 'mock', runs: 1 });
+    for (const stimulus of definition.stimuli) {
+      assert.deepEqual(stimulus.supported_executors, ['mock']);
+      assert.ok(stimulus.graders.every(grader => ['program', 'diff-contains'].includes(grader.type)));
+    }
+  }
   const names = new Set();
   const hashes = new Set();
   for (const definition of [old, composition, behavior]) {
