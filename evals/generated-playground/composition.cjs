@@ -1,16 +1,17 @@
 'use strict';
 
 const { spawnSync } = require('node:child_process');
-const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { isDeepStrictEqual } = require('node:util');
+const { parse } = require('yaml');
 const {
-  CheckError, requireEvidence, hasFields, inside, localDirectory, localItem, readText, readJson, fileList, reportError
+  authorRoot, CheckError, requireEvidence, hasFields, playgroundDirectory, localItem,
+  readText, readJson, sha256, fileList, reportError
 } = require('./local-files.cjs');
 const { inspectFrontend, observeOfflineStartup } = require('./frontend.cjs');
 
-const repo = path.resolve(__dirname, '..', '..');
-const pack = path.join(repo, '.github', 'skills', 'legacy-quest-formula');
+const pack = path.join(authorRoot, '.github', 'skills', 'legacy-quest-formula');
 const questIds = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, '0'));
 const assets = {
   'scripts/Test-QuestReadiness.ps1': 'scripts/Test-QuestReadiness.ps1',
@@ -20,17 +21,11 @@ const assets = {
 const outputSpec = 'evals/eagledesk-quests/eval.yaml';
 const screenshot = 'docs/images/eagledesk.png';
 const recognizedLicenses = new Set([
-  '0BSD', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'CC0-1.0', 'ISC', 'MIT',
-  'MPL-2.0', 'PostgreSQL', 'Unlicense', 'Zlib', 'GPL-2.0-only', 'GPL-2.0-or-later',
+  '0BSD', 'Apache-2.0', 'BlueOak-1.0.0', 'BSD-2-Clause', 'BSD-3-Clause', 'CC0-1.0', 'ISC', 'MIT',
+  'MPL-2.0', 'PostgreSQL', 'Python-2.0', 'Unlicense', 'Zlib', 'GPL-2.0-only', 'GPL-2.0-or-later',
   'GPL-3.0-only', 'GPL-3.0-or-later', 'LGPL-2.1-only', 'LGPL-2.1-or-later',
   'LGPL-3.0-only', 'LGPL-3.0-or-later'
 ]);
-
-function playgroundDirectory(value) {
-  const root = localDirectory(value);
-  requireEvidence(!inside(repo, root) && !inside(root, repo), 'Playground must be separate from the formula repository.');
-  return root;
-}
 
 function runPowerShell(args, input, env, name) {
   const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', ...args], {
@@ -41,31 +36,44 @@ function runPowerShell(args, input, env, name) {
   requireEvidence(result.status === 0, `${name} failed (exit ${result.status}); run the bundled checker locally for details.`);
 }
 
-function hasNoSetup(object) {
-  return !object || (!Object.keys(object).some(key =>
-    /^(?:agent_environment|environment|grading_environment|attachments|golden_.+|simulation|params|includes?)$/.test(key)) &&
-    Object.values(object).every(value => !value || typeof value !== 'object' || hasNoSetup(value)));
+function hasNoSetup(object, seen = new Set()) {
+  if (!object || typeof object !== 'object' || seen.has(object)) return true;
+  seen.add(object);
+  return Object.entries(object).every(([key, value]) =>
+    !/^(?:agent_environment|environment|grading_environment|attachments|golden_.+|simulation|params|includes?)$/.test(key) &&
+    hasNoSetup(value, seen));
 }
 
-async function readiness(root) {
+function readiness(root) {
   runPowerShell(['-File', path.join(pack, assets['scripts/Test-QuestReadiness.ps1']), '-OutputPath', root],
     undefined, {}, 'Pack structural readiness');
+  const instructions = fileList(root, '.github/instructions').filter(file => file.endsWith('.instructions.md'));
+  requireEvidence(instructions.some(file => /^---\r?\n[\s\S]*?^applyTo:\s*\S/m.test(readText(root, file))),
+    'A scoped agent instruction is missing.');
+  return 'The trusted structural checker passed and scoped instructions are present; declarations do not authorize use.';
+}
+
+function captureContainer(root) {
   const image = localItem(root, screenshot);
-  const header = Buffer.alloc(24);
+  const size = fs.statSync(image).size;
+  requireEvidence(size >= 57, 'The PNG container is truncated.');
+  const header = Buffer.alloc(33);
+  const end = Buffer.alloc(12);
   const handle = fs.openSync(image, 'r');
   try {
     fs.readSync(handle, header, 0, header.length, 0);
+    fs.readSync(handle, end, 0, end.length, size - end.length);
   } finally {
     fs.closeSync(handle);
   }
   requireEvidence(header.subarray(0, 8).toString('hex') === '89504e470d0a1a0a' &&
-    header.toString('ascii', 12, 16) === 'IHDR' && header.readUInt32BE(16) > 0 && header.readUInt32BE(20) > 0,
-  'Expected a nonempty PNG capture header.');
-  const instructions = fileList(root, '.github/instructions').filter(file => file.endsWith('.instructions.md'));
-  requireEvidence(instructions.some(file => /^---\r?\n[\s\S]*?^applyTo:\s*\S/m.test(readText(root, file))),
-    'A scoped agent instruction is missing.');
+    header.readUInt32BE(8) === 13 && header.toString('ascii', 12, 16) === 'IHDR' &&
+    header.readUInt32BE(16) > 0 && header.readUInt32BE(20) > 0 && end.toString('hex') === '0000000049454e44ae426082',
+  'Expected PNG signature, image dimensions and a final IEND chunk.');
+  return 'PNG container markers are present; neither pixels nor capture authenticity were verified.';
+}
 
-  const { parse } = require('yaml');
+async function proceduralSuite(root) {
   const { validateEvalSpec, createDefaultGraderRegistry } = await import('@microsoft/vally');
   let spec;
   try {
@@ -77,11 +85,28 @@ async function readiness(root) {
   requireEvidence(spec && hasNoSetup(spec), 'The generated Vally spec declares fixture setup or imported inputs.');
   const lint = validateEvalSpec(spec, { registry: createDefaultGraderRegistry() });
   requireEvidence(lint.valid, 'The generated procedural Vally spec fails static validation with the author Vally version.');
+  requireEvidence(spec.stimuli.length === 12 &&
+    new Set(spec.stimuli.map(stimulus => /^quest-(0[1-9]|1[0-2])(?:-|$)/.exec(stimulus.name)?.[1])
+      .filter(Boolean)).size === 12, 'The generated spec needs one stimulus for each of the twelve quests.');
   const names = spec.stimuli.flatMap(item => (item.graders ?? []).map(grader => grader.name));
   requireEvidence(spec.stimuli.every(item => item.graders?.length) &&
     names.every(Boolean) && new Set(names).size === names.length,
   'Each generated stimulus needs a uniquely named expectation.');
-  return 'Trusted readiness and static spec validation passed; the PNG header and scoped instruction are present.';
+  return 'Twelve unstaged procedural cases passed static Vally validation; none was executed.';
+}
+
+function questBriefs(root) {
+  const entries = fs.readdirSync(localItem(root, 'quests', 'directory'), { withFileTypes: true })
+    .filter(entry => /^\d{2}-/.test(entry.name));
+  requireEvidence(entries.length === 12 && entries.every(entry => entry.isDirectory() && !entry.isSymbolicLink()),
+    'Expected twelve numbered quest directories.');
+  for (const quest of questIds) {
+    const matches = entries.filter(entry => entry.name.startsWith(`${quest}-`));
+    requireEvidence(matches.length === 1 && matches[0].name.length > 3 &&
+      /\S/.test(readText(root, `quests/${matches[0].name}/README.md`)),
+    `Quest ${quest} does not have exactly one nonempty brief.`);
+  }
+  return 'Each quest from 01 to 12 has a nonempty brief; pedagogical quality requires review.';
 }
 
 function packIntegrity(root) {
@@ -116,12 +141,14 @@ function dependencyEvidence(root) {
   for (const manifest of manifests) {
     const prefix = manifest.slice(0, -'package.json'.length);
     const declared = manifest === 'package.json' ? pkg : readJson(root, manifest);
-    const direct = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']
-      .flatMap(field => Object.keys(declared[field] ?? {}));
+    const groups = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'];
+    const direct = groups.flatMap(field => Object.keys(declared[field] ?? {}));
     if (!direct.length) continue;
     const lock = readJson(root, `${prefix}package-lock.json`);
     requireEvidence([2, 3].includes(lock?.lockfileVersion) && lock.packages?.[''],
       'Expected a generated npm lockfile with package-level metadata.');
+    requireEvidence(groups.every(group => isDeepStrictEqual(declared[group] ?? {}, lock.packages[''][group] ?? {})),
+      'The dependency declarations and lockfile root inventory disagree.');
     if (!prefix) requireEvidence(lock.packages[''].devDependencies?.['@microsoft/vally-cli'] === version &&
       lock.packages['node_modules/@microsoft/vally-cli']?.version === version, 'Generated Vally lock and manifest disagree.');
     requireEvidence(direct.every(name => Object.hasOwn(lock.packages, `node_modules/${name}`)),
@@ -131,7 +158,8 @@ function dependencyEvidence(root) {
       count++;
       requireEvidence(component && !/^(?:unlicensed|proprietary|all rights reserved)$/i.test(component.license?.trim() ?? ''),
         'A locked npm component declares a non-open license.');
-      if (component.link || !/^sha(?:256|384|512)-[A-Za-z0-9+/]+={0,2}$/.test(component.integrity ?? '') ||
+      if (typeof component.version !== 'string' || component.link ||
+          !/^sha(?:256|384|512)-[A-Za-z0-9+/]+={0,2}$/.test(component.integrity ?? '') ||
           !recognizedLicenses.has(component.license)) unknown++;
     }
   }
@@ -158,19 +186,21 @@ function clueDiscovery(root) {
   const seen = new Set();
   const flags = [];
   for (const clue of clues) {
-    requireEvidence(Number.isInteger(clue?.quest) && clue.quest >= 1 && clue.quest <= 12 &&
-      !seen.has(clue.quest) && typeof clue.marker === 'string' && clue.marker.trim() &&
-      !/[\r\n]/.test(clue.marker) && !markers.has(clue.marker.toLowerCase()),
-    'Clue manifest has a non-integer or repeated quest or an empty or repeated marker.');
+    requireEvidence(hasFields(clue, ['quest', 'file', 'marker']) && Number.isInteger(clue.quest) &&
+      clue.quest >= 1 && clue.quest <= 12 && !seen.has(clue.quest) && typeof clue.marker === 'string' &&
+      clue.marker.trim() === clue.marker && clue.marker.length > 0 && !/[:\r\n]/.test(clue.marker) &&
+      !markers.has(clue.marker.toLowerCase()),
+    'Clue manifest has an invalid or repeated quest or marker.');
     seen.add(clue.quest);
     markers.add(clue.marker.toLowerCase());
     const prefix = `${clue.marker}: `;
-    const matching = readText(root, clue.file).split(/\r?\n/).filter(line => line.startsWith(`${clue.marker}:`));
+    const markerPrefix = `${clue.marker.toLowerCase()}:`;
+    const matching = readText(root, clue.file).split(/\r?\n/).filter(line => line.toLowerCase().startsWith(markerPrefix));
     requireEvidence(matching.length === 1 && matching[0].startsWith(prefix) &&
       /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(matching[0].slice(prefix.length)),
     'A clue source does not have exactly one correctly formatted marker line.');
     const value = matching[0].slice(prefix.length);
-    const hash = createHash('sha256').update(value, 'utf8').digest('hex');
+    const hash = sha256(value);
     requireEvidence(hash === hashes.get(questIds[clue.quest - 1]), `Flag hash does not match for quest ${clue.quest}.`);
     flags.push({ quest: clue.quest, value });
   }
@@ -215,6 +245,9 @@ function unseededInventory(root) {
 const checks = {
   readiness,
   'pack-integrity': packIntegrity,
+  'quest-briefs': questBriefs,
+  'capture-container': captureContainer,
+  'procedural-suite': proceduralSuite,
   'tier-wiring': tierWiring,
   'offline-startup': (root, options) => {
     const graph = inspectFrontend(root);
@@ -235,4 +268,4 @@ async function checkComposition(root, check, options = {}) {
   }
 }
 
-module.exports = { checkComposition, compositionChecks: Object.keys(checks), questIds };
+module.exports = { checkComposition, compositionChecks: Object.keys(checks), hasNoSetup, questIds };

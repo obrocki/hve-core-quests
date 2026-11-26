@@ -4,9 +4,11 @@
   "version": "1.0.0",
   "license": "MIT",
   "scripts": {
-    "eval:lint": "vally lint --eval-spec evals/ && vally lint --eval-spec evals/generated-playground/composition.eval.yaml && vally lint --eval-spec evals/generated-playground/behavioral.eval.yaml",
+    "eval:lint": "vally lint --eval-spec evals/eagledesk-quests/eval.yaml && vally lint --eval-spec evals/generated-playground/composition.eval.yaml && vally lint --eval-spec evals/generated-playground/behavioral.eval.yaml",
     "eval": "node scripts/eval-preflight.cjs",
-    "eval:composition": "node evals/generated-playground/program.cjs",
+    "eval:composition": "node evals/generated-playground/program.cjs composition",
+    "eval:evidence": "node evals/generated-playground/program.cjs evidence",
+    "test:generated": "node --test tests/generated-playground.test.cjs",
     "test": "node --test tests/workshop-safeguards.test.cjs tests/generated-playground.test.cjs"
   },
   "devDependencies": {

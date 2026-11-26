@@ -1,6 +1,6 @@
 'use strict';
 
-const { checkComposition, compositionChecks } = require('./composition.cjs');
+const { checkComposition, compositionChecks, questIds } = require('./composition.cjs');
 const { checkBehavior } = require('./behavior.cjs');
 
 async function runVally([kind, check]) {
@@ -15,22 +15,28 @@ async function runVally([kind, check]) {
   }));
 }
 
-async function main(args) {
-  if (args.length > 1) {
-    console.error('Expected one absolute playground path or HVE_QUEST_PLAYGROUND.');
+async function main([kind, argument, ...rest]) {
+  if (!['composition', 'evidence'].includes(kind) || rest.length) {
+    console.error('Expected composition or evidence, followed by an optional absolute playground path.');
     process.exitCode = 2;
     return;
   }
-  const root = args[0] ?? process.env.HVE_QUEST_PLAYGROUND;
+  const root = argument ?? process.env.HVE_QUEST_PLAYGROUND;
   const results = [];
-  for (const check of compositionChecks) {
-    results.push(await checkComposition(root, check, { chromium: process.env.HVE_QUEST_CHROMIUM }));
+  if (kind === 'composition') {
+    for (const check of compositionChecks) {
+      results.push(await checkComposition(root, check, { chromium: process.env.HVE_QUEST_CHROMIUM }));
+    }
+  } else {
+    for (const quest of questIds) results.push(checkBehavior(root, quest));
   }
   console.log(JSON.stringify(results, null, 2));
   process.exitCode = results.some(result => ['error', 'not-testable'].includes(result.status)) ? 2
     : results.some(result => result.status === 'fail') ? 1 : 0;
 }
 
-if (require.main === module) void main(process.argv.slice(2));
-
-module.exports = { runVally };
+if (require.main === module) {
+  const args = process.argv.slice(2);
+  if (args[0] === 'grade') void runVally(args.slice(1));
+  else void main(args);
+}

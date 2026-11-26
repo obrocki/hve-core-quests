@@ -2,7 +2,9 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { CheckError, requireEvidence, hasFields, localDirectory, localItem, readText, readJson, reportError } = require('./local-files.cjs');
+const {
+  CheckError, requireEvidence, hasFields, playgroundDirectory, localItem, readText, readJson, fileDigest, reportError
+} = require('./local-files.cjs');
 
 const outcomes = {
   '01': ['launch', 'offline-boundary', 'verified-behavior'],
@@ -22,6 +24,39 @@ const gateStates = new Set(['not-run', 'blocked', 'reported']);
 
 function substantive(value) {
   return typeof value === 'string' && value.trim().split(/\s+/).length >= 3;
+}
+
+const receiptPath = quest => `.hve-walkthrough/${quest}.json`;
+const artifactPath = quest => `.hve-walkthrough/${quest}.md`;
+
+function requireDigest(root, relative, digest) {
+  requireEvidence(typeof digest === 'string' && /^[a-f0-9]{64}$/.test(digest) && fileDigest(root, relative) === digest,
+    'A local artifact or evidence reference has a missing or stale digest.');
+}
+
+function readReceipt(root, quest) {
+  const receipt = readJson(root, receiptPath(quest));
+  const number = Number(quest);
+  requireEvidence(receipt?.schemaVersion === 1 && receipt.quest === number &&
+    receipt.previousQuest === (number === 1 ? null : number - 1),
+  'The receipt is unversioned or does not declare the prescribed quest and prerequisite.');
+  return receipt;
+}
+
+function reportedGates(root, gates) {
+  requireEvidence(hasFields(gates, ['native', 'human', 'runtime']), 'Expected separate native, human and runtime declarations.');
+  return Object.fromEntries(Object.entries(gates).map(([kind, gate]) => {
+    requireEvidence(hasFields(gate, ['status', 'references']) && gateStates.has(gate.status) &&
+      Array.isArray(gate.references) && (gate.status !== 'reported' || gate.references.length > 0),
+    'A gate declaration is malformed or reports an observation without a local reference.');
+    for (const reference of gate.references) {
+      requireEvidence(hasFields(reference, ['path', 'sha256']) && typeof reference.path === 'string' &&
+        !/^\.hve-walkthrough\/\d\d\.(?:md|json)$/i.test(reference.path),
+      'A gate needs a local evidence reference other than the quest deliverable or receipt.');
+      requireDigest(root, reference.path, reference.sha256);
+    }
+    return [kind, gate.status];
+  }));
 }
 
 function sourceFiles(root, references) {
@@ -59,21 +94,27 @@ function checkBehavior(workspace, quest) {
     check: quest,
     native: 'not-testable',
     human: 'not-testable',
-    runtime: 'not-testable'
+    runtime: 'not-testable',
+    semantic: 'uncalibrated'
   };
   try {
     requireEvidence(Object.hasOwn(outcomes, quest), 'Unknown walkthrough quest.');
-    const root = localDirectory(workspace);
-    const artifact = readText(root, `.hve-walkthrough/${quest}.md`);
-    const receipt = readJson(root, `.hve-walkthrough/${quest}.json`);
-    requireEvidence(substantive(artifact) && receipt?.quest === Number(quest) &&
-      hasFields(receipt.gates, ['native', 'human', 'runtime']) && Object.values(receipt.gates).every(gate => gateStates.has(gate)),
-    'Expected a nonempty artifact and separate native, human and runtime gate declarations.');
-    result.reported = receipt.gates;
+    const root = playgroundDirectory(workspace);
+    const receipt = readReceipt(root, quest);
+    result.reported = reportedGates(root, receipt.gates);
     if (receipt.artifact === 'blocked') throw new CheckError('Quest authorship was reported blocked.', 'not-testable');
     requireEvidence(receipt.artifact === 'ready' && hasFields(receipt.outcomes, outcomes[quest]) &&
       Array.isArray(receipt.limits) && receipt.limits.some(substantive),
     'Quest evidence is missing required outcome records or limitations.');
+    const artifact = artifactPath(quest);
+    requireEvidence(substantive(readText(root, artifact)), 'The quest deliverable is empty.');
+    requireDigest(root, artifact, receipt.artifactSha256);
+    if (receipt.previousQuest !== null) {
+      const previous = String(receipt.previousQuest).padStart(2, '0');
+      const predecessor = readReceipt(root, previous);
+      requireEvidence(predecessor.artifact === 'ready', 'The preceding quest has no ready artifact.');
+      requireDigest(root, artifactPath(previous), predecessor.artifactSha256);
+    }
     const references = {};
     for (const [key, outcome] of Object.entries(receipt.outcomes)) {
       requireEvidence(hasFields(outcome, ['finding', 'sources']) && substantive(outcome.finding),
@@ -86,7 +127,7 @@ function checkBehavior(workspace, quest) {
       references.application.some(logic => logic !== ui &&
         references.data.some(data => data !== logic && data !== ui))),
     'The trace does not cite separate presentation, application and data sources.');
-    checkRunRecords(quest, receipt.runs, receipt.gates.runtime);
+    checkRunRecords(quest, receipt.runs, result.reported.runtime);
     return { ...result, status: 'pass', evidence: 'Local artifact and referenced evidence shape passed; claims and gates remain unverified.' };
   } catch (error) {
     return { ...result, ...reportError(error) };

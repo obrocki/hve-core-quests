@@ -14,6 +14,8 @@ const repo = path.resolve(__dirname, '..');
 const suite = path.join(repo, 'evals', 'generated-playground');
 const checker = path.join(suite, 'program.cjs');
 const spec = name => parse(fs.readFileSync(path.join(suite, `${name}.eval.yaml`), 'utf8'));
+const digest = value => createHash('sha256').update(value).digest('hex');
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/0ioAAAAASUVORK5CYII=', 'base64');
 
 function temp(t) {
   const root = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'hve-author-probe-'));
@@ -45,15 +47,14 @@ function structure(write) {
   for (const { quest, file, marker } of clues) write(file, `[Home](../../README.md)\n${marker}: probe-${quest}\n`);
   write('quests/clues.json', clues);
   write('quests/flags.sha256', questIds.map((id, index) =>
-    `${id} ${createHash('sha256').update(`probe-${index + 1}`).digest('hex')}`).join('\n') + '\n');
+    `${id} ${digest(`probe-${index + 1}`)}`).join('\n') + '\n');
   write('docs/workshop-data.json', {
     schemaVersion: 1, purpose: 'workshop', inputMode: 'unseeded', intendedAudience: 'local',
     distributionStatus: 'not-cleared',
     artifacts: ['README.md', 'app', 'docs/images', 'quests']
       .map(scope => ({ scope, method: 'deterministic', modelChannelCategory: null }))
   });
-  // Header probe only: no generated UI or genuine capture is used in this test.
-  write('docs/images/eagledesk.png', Buffer.from('89504e470d0a1a0a0000000d494844520000000100000001', 'hex'));
+  write('docs/images/eagledesk.png', png);
   write('.github/instructions/probe.instructions.md', '---\napplyTo: "quests/**"\n---\nUse local checks.\n');
   const version = '0.20.0';
   const devDependencies = { '@microsoft/vally-cli': version };
@@ -74,15 +75,42 @@ function structure(write) {
   return clues;
 }
 
-test('composition inspects applicable local evidence without passing the missing browser gate', async t => {
-  const { root, write } = temp(t);
-  structure(write);
-  const results = [];
-  for (const check of compositionChecks) results.push(await checkComposition(root, check));
-  assert.deepEqual(results.map(result => result.status), compositionChecks.map(check =>
-    check === 'offline-startup' ? 'not-testable' : 'pass'), JSON.stringify(results));
+test('Vally MockExecutor and all composition graders leave an unconfigured browser unresolved', async t => {
+  const output = temp(t);
+  const workspace = temp(t);
+  const { MockExecutor } = await import('@microsoft/vally/executor/mock');
+  const { gradeTrajectory, loadEvalSpec } = await import('@microsoft/vally');
+  const executor = new MockExecutor();
+  const composition = await loadEvalSpec(path.join(suite, 'composition.eval.yaml'));
+  structure(output.write);
+  const seen = [];
+  for (const stimulus of composition.stimuli) {
+    const trajectory = await executor.execute(stimulus, { workDir: workspace.root, skills: [] });
+    assert.equal(trajectory.metadata.executor, 'mock');
+    const [grader] = stimulus.graders;
+    const evaluation = await gradeTrajectory(trajectory, [withAuthorPath(grader, {
+      HVE_QUEST_PLAYGROUND: output.root, HVE_QUEST_CHROMIUM: ''
+    })], { stimulus });
+    const detail = evaluation.details[0];
+    seen.push([detail.metadata?.check, detail.metadata?.status, detail.evidence]);
+  }
+  assert.deepEqual(seen.map(([check, status]) => [check, status]), compositionChecks.map(check =>
+    [check, check === 'offline-startup' ? 'not-testable' : 'pass']), JSON.stringify(seen));
   assert.equal((await checkComposition(undefined, 'readiness')).status, 'not-testable');
   assert.equal((await checkComposition(repo, 'readiness')).status, 'fail');
+});
+
+test('capture, brief and generated spec checks reject independent missing evidence', async t => {
+  const { root, write } = temp(t);
+  structure(write);
+  write('docs/images/eagledesk.png', png.subarray(0, -12));
+  assert.match((await checkComposition(root, 'capture-container')).evidence, /final IEND|truncated/);
+  write('quests/07-probe/README.md', '\n');
+  assert.match((await checkComposition(root, 'quest-briefs')).evidence, /07.*nonempty brief/);
+  const procedural = 'evals/eagledesk-quests/eval.yaml';
+  const original = fs.readFileSync(path.join(repo, procedural), 'utf8');
+  write(procedural, `${original}\nagent_environment: {}\n`);
+  assert.match((await checkComposition(root, 'procedural-suite')).evidence, /fixture setup/);
 });
 
 test('composition rejects disconnected sources and nonlocal and out-of-output frontend assets', async t => {
@@ -117,15 +145,26 @@ test('composition distinguishes wrong evidence from incomplete licensing and pro
   write('app/service/probe.csproj', '<Project />');
   assert.equal((await checkComposition(root, 'dependency-evidence')).status, 'not-testable');
   const lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
+  lock.packages[''].dependencies = { other: 'anything' };
+  write('package-lock.json', lock);
+  assert.match((await checkComposition(root, 'dependency-evidence')).evidence, /root inventory disagree/);
+  delete lock.packages[''].dependencies;
   lock.packages['node_modules/@microsoft/vally-cli'].license = 'UNLICENSED';
   write('package-lock.json', lock);
   assert.equal((await checkComposition(root, 'dependency-evidence')).status, 'fail');
   clues[1].marker = clues[0].marker;
   write('quests/clues.json', clues);
-  assert.match((await checkComposition(root, 'clue-discovery')).evidence, /repeated marker/);
+  assert.match((await checkComposition(root, 'clue-discovery')).evidence, /repeated quest or marker/);
+  clues[1].marker = 'marker-02';
+  clues[1].quest = '2';
+  write('quests/clues.json', clues);
+  assert.match((await checkComposition(root, 'clue-discovery')).evidence, /invalid or repeated quest/);
+  clues[1].quest = 2;
+  write('quests/clues.json', JSON.stringify(clues).replace('"quest":2', '"quest":3,"quest":2'));
+  assert.match((await checkComposition(root, 'clue-discovery')).evidence, /duplicate or ambiguous JSON/);
 });
 
-test('offline startup observes real file rendering and rejects a script error', {
+test('offline startup observes file rendering and rejects script errors and attempted remote requests', {
   skip: !process.env.HVE_QUEST_TEST_CHROMIUM
 }, async t => {
   const { root, write } = temp(t);
@@ -135,14 +174,29 @@ test('offline startup observes real file rendering and rejects a script error', 
   assert.equal(startup.status, 'pass', startup.evidence);
   write('app/web/c.js', 'ProbeLogic.count(); throw new Error("Startup probe");\n');
   assert.equal((await checkComposition(root, 'offline-startup', options)).status, 'fail');
+  write('app/web/c.js', `document.querySelector('main').textContent = String(ProbeLogic.count());
+const image = document.createElement('img');
+document.querySelector('main').append(image);
+image.src = 'https://example.invalid/startup-probe.png';\n`);
+  assert.equal((await checkComposition(root, 'offline-startup', options)).status, 'fail');
 });
 
 function walkthrough(write, id) {
   const references = { application: 'app/logic/b.js', data: 'app/store/a.js' };
+  const deliverable = 'A data-free artifact for testing the checker.';
+  const observation = 'Local probe metadata only.';
+  const reported = { status: 'reported', references: [{ path: '.hve-walkthrough/probe.log', sha256: digest(observation) }] };
   const receipt = {
+    schemaVersion: 1,
     quest: Number(id),
+    previousQuest: id === '01' ? null : Number(id) - 1,
     artifact: 'ready',
-    gates: { native: 'not-run', human: 'blocked', runtime: 'not-run' },
+    artifactSha256: digest(deliverable),
+    gates: {
+      native: { status: 'not-run', references: [] },
+      human: { status: 'blocked', references: [] },
+      runtime: { status: 'not-run', references: [] }
+    },
     limits: ['The statements here exercise receipt structure only.'],
     outcomes: Object.fromEntries(outcomes[id].map(key => [key, {
       finding: 'A finding with an output-local reference.',
@@ -150,22 +204,23 @@ function walkthrough(write, id) {
     }]))
   };
   if (id === '07') {
-    receipt.gates.runtime = 'reported';
+    receipt.gates.runtime = reported;
     receipt.runs = {
       conflict: { command: 'local probe', exit: 0, detected: true },
       control: { command: 'local probe', exit: 0, detected: false }
     };
   }
   if (id === '12') {
-    receipt.gates.runtime = 'reported';
+    receipt.gates.runtime = reported;
     receipt.runs = {
       red: { command: 'local target', exit: 1 },
       green: { command: 'local target', exit: 0 },
       regression: { command: 'local baseline', exit: 0 }
     };
   }
-  write(`.hve-walkthrough/${id}.md`, 'A data-free artifact for testing the checker.');
+  write(`.hve-walkthrough/${id}.md`, deliverable);
   write(`.hve-walkthrough/${id}.json`, receipt);
+  if (receipt.gates.runtime === reported) write('.hve-walkthrough/probe.log', observation);
   return receipt;
 }
 
@@ -178,6 +233,7 @@ test('all twelve artifact graders reject missing or incomplete evidence without 
     const result = checkBehavior(root, id);
     assert.equal(result.status, 'pass', `${id}: ${result.evidence}`);
     for (const gate of ['native', 'human', 'runtime']) assert.equal(result[gate], 'not-testable', id);
+    assert.equal(result.semantic, 'uncalibrated');
     delete receipt.outcomes[outcomes[id][0]];
     write(`.hve-walkthrough/${id}.json`, receipt);
     assert.equal(checkBehavior(root, id).status, 'fail', id);
@@ -187,23 +243,51 @@ test('all twelve artifact graders reject missing or incomplete evidence without 
 test('behavioral graders reject self-citations, fake controls and a changed red/green command', t => {
   const { root, write } = temp(t);
   frontend(write);
-  const trace = walkthrough(write, '02');
+  const receipts = Object.fromEntries(questIds.map(quest => [quest, walkthrough(write, quest)]));
+  const trace = receipts['02'];
   trace.outcomes.data.sources = [{ path: '.hve-walkthrough/02.md', line: 1 }];
   write('.hve-walkthrough/02.json', trace);
   assert.match(checkBehavior(root, '02').evidence, /references itself/);
-  const reproduction = walkthrough(write, '07');
-  reproduction.gates.runtime = 'blocked';
+  const reproduction = receipts['07'];
+  const saved = reproduction.gates.runtime;
+  write('.hve-walkthrough/probe.log', 'Changed local probe metadata.');
+  assert.match(checkBehavior(root, '07').evidence, /stale digest/);
+  write('.hve-walkthrough/probe.log', 'Local probe metadata only.');
+  reproduction.gates.runtime = { status: 'blocked', references: [] };
   write('.hve-walkthrough/07.json', reproduction);
   assert.equal(checkBehavior(root, '07').status, 'not-testable');
-  reproduction.gates.runtime = 'reported';
+  reproduction.gates.runtime = saved;
   reproduction.runs.control.detected = true;
   write('.hve-walkthrough/07.json', reproduction);
   assert.match(checkBehavior(root, '07').evidence, /do not discriminate/);
-  const delivery = walkthrough(write, '12');
+  const delivery = receipts['12'];
   delivery.runs.red.command = 'unrelated command';
   write('.hve-walkthrough/12.json', delivery);
   assert.match(checkBehavior(root, '12').evidence, /one test command/);
 });
+
+test('walkthrough artifacts are bound to their receipts, predecessor and cited local evidence', t => {
+  const { root, write } = temp(t);
+  frontend(write);
+  const second = walkthrough(write, '02');
+  assert.equal(checkBehavior(root, '02').status, 'fail');
+  const first = walkthrough(write, '01');
+  assert.equal(checkBehavior(root, '02').status, 'pass');
+  second.previousQuest = '1';
+  write('.hve-walkthrough/02.json', second);
+  assert.match(checkBehavior(root, '02').evidence, /prescribed quest and prerequisite/);
+  second.previousQuest = 1;
+  write('.hve-walkthrough/02.json', second);
+  write('.hve-walkthrough/01.md', 'The artifact has changed after its receipt.');
+  assert.match(checkBehavior(root, '02').evidence, /stale digest/);
+  first.gates.native = { status: 'reported', references: [] };
+  write('.hve-walkthrough/01.json', first);
+  assert.match(checkBehavior(root, '01').evidence, /observation without/);
+});
+
+function withAuthorPath(grader, env = {}) {
+  return { ...grader, config: { ...grader.config, env: { HVE_QUEST_AUTHOR_CHECKER: checker, ...env } } };
+}
 
 function additions(id, ending = '\n') {
   return ['md', 'json'].map(ext => `--- /dev/null${ending}+++ b/.hve-walkthrough/${id}.${ext}${ending}`).join('');
@@ -261,7 +345,7 @@ test('Vally program adapters grade external local evidence and fail closed witho
   frontend(write);
   const grade = (candidate, env) => grader.grade({
     trajectory: { workDir: root },
-    config: { ...candidate.config, env: { HVE_QUEST_AUTHOR_CHECKER: checker, ...env } }
+    config: withAuthorPath(candidate, env).config
   });
   const behavior = spec('behavioral').stimuli[0].graders[0];
   const absent = await grade(behavior);
@@ -278,6 +362,31 @@ test('Vally program adapters grade external local evidence and fail closed witho
   assert.equal(checked.passed, true, checked.evidence);
 });
 
+test('the full Vally behavioral grade accepts ordered synthetic evidence, but not a mock echo', async t => {
+  const { root, write } = temp(t);
+  const { MockExecutor } = await import('@microsoft/vally/executor/mock');
+  const { gradeTrajectory, loadEvalSpec } = await import('@microsoft/vally');
+  const { stimuli: [stimulus] } = await loadEvalSpec(path.join(suite, 'behavioral.eval.yaml'));
+  const graders = stimulus.graders.map(grader => grader.type === 'program' ? withAuthorPath(grader) : grader);
+  const trajectory = await new MockExecutor().execute(stimulus, { workDir: root, skills: [] });
+  const score = () => gradeTrajectory(trajectory, graders, { stimulus });
+  const echo = await score();
+  assert.equal(echo.passed, false);
+  assert.equal(echo.details.filter(detail => detail.passed).length, 0);
+  assert.equal(trajectory.metadata.executor, 'mock');
+
+  frontend(write);
+  for (const quest of questIds) walkthrough(write, quest);
+  // The built-in mock executor does not observe stable turn completion or capture patches.
+  trajectory.turnDiffs = questIds.map((id, turn) => ({ turn, diff: additions(id) }));
+  trajectory.turnDiffs.at(-1).diff += '--- a/app/web/c.js\n+++ b/app/web/c.js\n';
+  const grade = await score();
+  assert.equal(grade.passed, true, `${grade.evidence}: ${grade.details.filter(detail => !detail.passed).map(d => d.evidence)}`);
+  assert.equal(grade.details.filter(detail => detail.passed).length, 25);
+  assert.equal(grade.details.filter(detail => detail.graderType === 'program').every(detail =>
+    detail.metadata.native === 'not-testable' && detail.metadata.semantic === 'uncalibrated'), true);
+});
+
 test('suite specs contain no staged material and dedupe all prompt and turn text by normalized SHA-256', () => {
   const old = parse(fs.readFileSync(path.join(repo, 'evals', 'eagledesk-quests', 'eval.yaml'), 'utf8'));
   const composition = spec('composition');
@@ -291,7 +400,7 @@ test('suite specs contain no staged material and dedupe all prompt and turn text
       /"(?:agent_environment|environment|grading_environment|attachments|golden_[^"]+|simulation)"\s*:/);
     for (const stimulus of definition.stimuli) {
       for (const prompt of stimulus.turns ?? [stimulus.prompt]) {
-        const hash = createHash('sha256').update(prompt.normalize('NFC').trim().toLowerCase().replace(/\s+/gu, ' ')).digest('hex');
+        const hash = digest(prompt.normalize('NFC').trim().toLowerCase().replace(/\s+/gu, ' '));
         assert.ok(!hashes.has(hash), `Duplicate normalized prompt digest: ${hash}`);
         hashes.add(hash);
       }
@@ -301,5 +410,5 @@ test('suite specs contain no staged material and dedupe all prompt and turn text
       }
     }
   }
-  assert.equal(hashes.size, 31);
+  assert.equal(hashes.size, 34);
 });

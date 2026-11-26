@@ -1,5 +1,5 @@
 name: generated-playground-behavior
-description: Twelve ordered quest turns with turn-scoped artifact creation and deterministic evidence-shape grading.
+description: Unstaged, blocked live walkthrough contract with twelve ordered turns and deterministic evidence-shape grading.
 type: capability
 defaults:
   runs: 1
@@ -10,6 +10,7 @@ stimuli:
     supported_executors: [copilot-sdk]
     tags:
       advisory: "true"
+      execution: blocked
     turns:
       - |
         Quest 01, Documentation. Work only in an already eligible, isolated local playground.
@@ -17,9 +18,14 @@ stimuli:
         Write a launch guide that accurately separates the file-based frontend from optional connected services.
         Name what the reader can verify locally and what remains unknown.
 
-        For each turn NN, create .hve-walkthrough/NN.md with the deliverable and .hve-walkthrough/NN.json
-        with the numeric quest, artifact (ready or blocked), gates (native, human, runtime, each one of
-        not-run, blocked or reported), limits (an array of limitations), and outcomes (an object).
+        For each turn NN, create .hve-walkthrough/NN.md with the deliverable and .hve-walkthrough/NN.json.
+        Set schemaVersion to 1, quest to its integer number, previousQuest to the preceding integer
+        (null in 01), artifact to ready or blocked, and artifactSha256 to the lowercase SHA-256 of
+        the deliverable's bytes when ready. Include limits as an array and outcomes as an object.
+        Give gates exactly three entries: native, human and runtime. Each has status (not-run,
+        blocked or reported) and references (an array of {path, sha256} local evidence locators).
+        For a reported gate, cite at least one nonempty local evidence file other than the quest
+        deliverables or receipts. A reference is not verification. Keep earlier deliverables intact.
         Use the turn's named outcome keys. Each value has a finding in your own words and sources,
         a nonempty array of {path, line} locators to supporting local source outside .hve-walkthrough.
         A locator is output-relative with a one-based line number. Cite app/web/index.html for launch.
@@ -35,8 +41,8 @@ stimuli:
         unanswered questions and any unperformed run. Create the 02 walkthrough artifact and receipt.
         Outcomes: presentation, application, data, unknowns.
       - |
-        Quest 03, User empathy. Use the local invented roles as evidence for an inclusive journey or
-        sketch involving the traced workflow. Relate different role needs to concrete friction or
+        Quest 03, User empathy. Use invented perspectives from distinct operational role categories
+        as evidence for an inclusive journey or sketch involving the traced workflow. Relate different role needs to concrete friction or
         accommodations, label assumptions, and say what would need human validation. Create the 03
         walkthrough artifact and receipt.
         Outcomes: roles, journey, inclusion, unvalidated.
@@ -108,7 +114,9 @@ stimuli:
             - &dispatch >-
               const checker = process.env.HVE_QUEST_AUTHOR_CHECKER;
               if (!checker || !require("node:path").isAbsolute(checker)) throw new Error("Trusted local checker path required.");
-              require(checker).runVally(process.argv.slice(1));
+              const result = require("node:child_process").spawnSync(process.execPath, [checker, "grade", ...process.argv.slice(1)], {stdio: "inherit"});
+              if (result.error) throw result.error;
+              process.exitCode = result.status ?? 1;
             - behavior
             - "01"
       - type: diff-contains

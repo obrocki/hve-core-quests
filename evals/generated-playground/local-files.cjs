@@ -1,7 +1,11 @@
 'use strict';
 
+const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { parseDocument } = require('yaml');
+
+const authorRoot = path.resolve(__dirname, '..', '..');
 
 class CheckError extends Error {
   constructor(message, status = 'fail') {
@@ -26,8 +30,9 @@ function inside(parent, child) {
 }
 
 function localDirectory(value) {
-  if (!value) throw new CheckError('No local directory was supplied.', 'not-testable');
-  requireEvidence(path.isAbsolute(value) && !/^[\\/]{2}/.test(value), 'Expected an absolute local directory.');
+  if (value === undefined || value === '') throw new CheckError('No local directory was supplied.', 'not-testable');
+  requireEvidence(typeof value === 'string' && path.isAbsolute(value) && !/^[\\/]{2}/.test(value),
+    'Expected an absolute local directory.');
   const directory = path.resolve(value);
   requireEvidence(directory !== path.parse(directory).root, 'A volume root is not a valid directory.');
   for (let item = directory; item !== path.dirname(item); item = path.dirname(item)) {
@@ -35,6 +40,13 @@ function localDirectory(value) {
     requireEvidence(stat?.isDirectory() && !stat.isSymbolicLink(), 'Directory is missing or passes through a link.');
   }
   return directory;
+}
+
+function playgroundDirectory(value) {
+  const root = localDirectory(value);
+  requireEvidence(!inside(authorRoot, root) && !inside(root, authorRoot),
+    'Playground must be separate from the formula repository.');
+  return root;
 }
 
 function localItem(root, relative, type = 'file') {
@@ -64,12 +76,27 @@ function readText(root, relative) {
 
 function readJson(root, relative) {
   const text = readText(root, relative);
+  let value;
   try {
-    return JSON.parse(text);
+    value = JSON.parse(text);
   } catch (error) {
     if (!(error instanceof SyntaxError)) throw error;
     throw new CheckError('Evidence contains malformed JSON.');
   }
+  requireEvidence(parseDocument(text, { schema: 'json', uniqueKeys: true }).errors.length === 0,
+    'Evidence contains duplicate or ambiguous JSON keys.');
+  return value;
+}
+
+function sha256(value) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function fileDigest(root, relative) {
+  const file = localItem(root, relative);
+  const size = fs.statSync(file).size;
+  requireEvidence(size > 0 && size <= 8 * 1024 * 1024, 'Expected bounded, nonempty evidence for the digest.');
+  return sha256(fs.readFileSync(file));
 }
 
 function fileList(root, relative = '') {
@@ -89,4 +116,7 @@ function reportError(error) {
   return { status: 'error', evidence: `Local checker error (${error.code || error.name}).` };
 }
 
-module.exports = { CheckError, requireEvidence, hasFields, inside, localDirectory, localItem, readText, readJson, fileList, reportError };
+module.exports = {
+  authorRoot, CheckError, requireEvidence, hasFields, inside, playgroundDirectory, localItem,
+  readText, readJson, sha256, fileDigest, fileList, reportError
+};

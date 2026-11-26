@@ -18,7 +18,9 @@ stimuli:
             - &dispatch >-
               const checker = process.env.HVE_QUEST_AUTHOR_CHECKER;
               if (!checker || !require("node:path").isAbsolute(checker)) throw new Error("Trusted local checker path required.");
-              require(checker).runVally(process.argv.slice(1));
+              const result = require("node:child_process").spawnSync(process.execPath, [checker, "grade", ...process.argv.slice(1)], {stdio: "inherit"});
+              if (result.error) throw result.error;
+              process.exitCode = result.status ?? 1;
             - composition
             - readiness
   - name: generated-pack-integrity
@@ -29,6 +31,30 @@ stimuli:
         config:
           program: node
           args: [-e, *dispatch, composition, pack-integrity]
+  - name: generated-quest-briefs
+    prompt: Verify each numbered quest has its own nonempty local brief.
+    graders:
+      - type: program
+        name: generated-numbered-briefs
+        config:
+          program: node
+          args: [-e, *dispatch, composition, quest-briefs]
+  - name: generated-png-container
+    prompt: Check the expected local capture for an intact PNG container without interpreting its pixels.
+    graders:
+      - type: program
+        name: generated-capture-markers
+        config:
+          program: node
+          args: [-e, *dispatch, composition, capture-container]
+  - name: generated-procedural-contract
+    prompt: Validate the generated twelve-quest procedural spec without loading or executing an agent.
+    graders:
+      - type: program
+        name: generated-static-procedural-suite
+        config:
+          program: node
+          args: [-e, *dispatch, composition, procedural-suite]
   - name: generated-three-tier-wiring
     prompt: Find a connected local resource path from the frontend to logic to storage.
     graders:
