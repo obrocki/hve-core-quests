@@ -79,6 +79,13 @@ function scopedTurns(events, workspace, quest, ids) {
   });
 }
 
+function invocation(target, { type, data }) {
+  const model = data.model;
+  const observedModel = typeof model === 'string' && /^[a-z0-9][a-z0-9._-]{0,95}$/i.test(model) &&
+    !/^(?:unknown|unobserved)$/i.test(model) ? model : 'unobserved';
+  return { target, eventType: type, observedModel };
+}
+
 function nativeOccurrences(turns) {
   const occurrences = [];
   for (const { turnId, events } of turns) {
@@ -98,7 +105,7 @@ function nativeOccurrences(turns) {
       } else if (entry.type === 'subagent.started' && !rootEvent(entry) && !children.has(entry.agentId)) {
         const target = launchCalls.get(data.toolCallId);
         if (target && target === data.agentName) {
-          occurrences.push(`agent:${target.slice(plugin.name.length + 1)}`);
+          occurrences.push(invocation(`agent:${target.slice(plugin.name.length + 1)}`, entry));
           children.add(entry.agentId);
           launchCalls.delete(data.toolCallId);
         }
@@ -106,7 +113,7 @@ function nativeOccurrences(turns) {
           data.trigger === 'agent-invoked' && data.pluginName === plugin.name &&
           data.pluginVersion === plugin.version && (data.source === undefined || data.source === 'plugin') &&
           typeof data.name === 'string') {
-        occurrences.push(`skill:${data.name}`);
+        occurrences.push(invocation(`skill:${data.name}`, entry));
       }
     }
   }
@@ -116,7 +123,7 @@ function nativeOccurrences(turns) {
 function checkNative(workspace, quest, tracePath, entries) {
   const definition = Object.hasOwn(steps, quest) ? steps[quest] : undefined;
   const expected = definition?.required.length ?? 0;
-  const unobserved = { status: 'not-run', required: expected, observed: 0, conditionalObserved: 0 };
+  const unobserved = { status: 'not-run', required: expected, observed: 0, conditionalObserved: 0, invocations: [] };
   if (!definition) return { ...unobserved, code: 'unknown-quest' };
   try {
     need(Array.isArray(entries) && entries.length > 0 && entries.length <= 32 &&
@@ -124,18 +131,21 @@ function checkNative(workspace, quest, tracePath, entries) {
     const { events, digest } = loadTrace(workspace, tracePath);
     const occurrences = nativeOccurrences(scopedTurns(events, workspace, quest, entries));
     let cursor = -1;
-    let observed = 0;
+    const required = [];
     for (const target of definition.required) {
-      const next = occurrences.indexOf(target, cursor + 1);
+      const next = occurrences.findIndex((item, index) => index > cursor && item.target === target);
       if (next === -1) continue;
-      observed++;
+      required.push(occurrences[next]);
       cursor = next;
     }
-    const conditionalObserved = (definition.conditional ?? []).filter(target => occurrences.includes(target)).length;
+    const conditional = (definition.conditional ?? [])
+      .map(target => occurrences.find(item => item.target === target)).filter(Boolean);
+    const observed = required.length;
     return {
       status: observed === expected ? 'observed' : 'not-run',
       code: observed === expected ? 'mapped-invocations-observed' : 'required-invocations-not-observed-in-order',
-      required: expected, observed, conditionalObserved, traceSha256: digest
+      required: expected, observed, conditionalObserved: conditional.length,
+      invocations: [...required, ...conditional], traceSha256: digest
     };
   } catch (error) {
     if (error instanceof CheckError) return { ...unobserved, code: error.status === 'not-run' ? error.message : 'trace-unavailable' };

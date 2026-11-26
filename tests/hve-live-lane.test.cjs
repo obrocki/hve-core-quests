@@ -192,6 +192,38 @@ test('agent evidence joins a native launch to its started child before counting 
   assert.equal(grade('11', noExperiment).conditionalObserved, 0);
 });
 
+test('host-shaped Quest 10 evidence credits the skill and privacy dispatch, not the disabled agent attempt', t => {
+  const f = setup(t);
+  const fixture = fs.readFileSync(path.join(__dirname, 'fixtures', 'hve-quest-10.events.jsonl'), 'utf8');
+  const events = fixture.trimEnd().split(/\r?\n/).map(line => JSON.parse(line));
+  events[0].data.context.cwd = f.workspace;
+  const save = () => fs.writeFileSync(f.trace, `${events.map(event => JSON.stringify(event)).join('\n')}\n`);
+  save();
+  const [complete, attempt] = events.filter(event => event.type === 'user.message');
+  const grade = event => invoke(['grade', ...attested, '--quest', '10', '--workspace', f.workspace,
+    '--trace', f.trace, '--entry', event.id]);
+  const accepted = grade(complete);
+  assert.equal(accepted.exit, 0);
+  assert.equal(accepted.record.artifact, 'not-run');
+  assert.equal(accepted.record.native.status, 'observed');
+  assert.equal(accepted.record.native.observed, 2);
+  assert.deepEqual(accepted.record.native.invocations, [
+    { target: 'skill:accessibility', eventType: 'skill.invoked', observedModel: 'gpt-6.1-terra' },
+    { target: 'agent:privacy-planner', eventType: 'subagent.started', observedModel: 'claude-sonnet-5.5' }
+  ]);
+  assert.doesNotMatch(accepted.output, /fixture-extra|Data-free|hve-fixture|subagent_configuration/);
+  const rejected = grade(attempt).record.native;
+  assert.equal(rejected.status, 'not-run');
+  assert.equal(rejected.observed, 0);
+  assert.deepEqual(rejected.invocations, []);
+  events.find(event => event.type === 'skill.invoked').data.model = 'https://example.invalid/private-route';
+  save();
+  const withheld = grade(complete);
+  assert.equal(withheld.record.native.status, 'observed');
+  assert.equal(withheld.record.native.invocations[0].observedModel, 'unobserved');
+  assert.doesNotMatch(withheld.output, /example\.invalid/);
+});
+
 test('multi-step native evidence preserves order across explicitly bound follow-ups', t => {
   const f = setup(t);
   const earlier = f.turn('12', () => {
@@ -250,6 +282,7 @@ test('one-turn Vally ProgramGrader accepts a recorded invocation but not the moc
   const accepted = await grade(present);
   assert.equal(accepted.passed, true, accepted.evidence);
   assert.equal(accepted.metadata.native.status, 'observed');
+  assert.equal(accepted.metadata.native.invocations[0].observedModel, 'unobserved');
   const rejected = await grade(absent);
   assert.equal(rejected.passed, false);
   assert.equal(rejected.metadata.native.status, 'not-run');

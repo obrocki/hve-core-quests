@@ -11,7 +11,7 @@ const steps = {
   '07': { required: ['skill:root-cause-analysis'] },
   '08': { required: ['skill:security-planning'] },
   '09': { required: ['agent:sssc-planner'] },
-  '10': { required: ['agent:accessibility-planner', 'agent:privacy-planner'] },
+  '10': { required: ['skill:accessibility', 'agent:privacy-planner'] },
   '11': { required: ['agent:rai-planner'], conditional: ['agent:experiment-designer'] },
   '12': { required: ['skill:rpi-research', 'skill:rpi-plan', 'skill:rpi-implement', 'skill:rpi-review'] }
 };
