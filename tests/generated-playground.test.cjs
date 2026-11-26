@@ -15,7 +15,7 @@ const suite = path.join(repo, 'evals', 'generated-playground');
 const checker = path.join(suite, 'program.cjs');
 const spec = name => parse(fs.readFileSync(path.join(suite, `${name}.eval.yaml`), 'utf8'));
 const digest = value => createHash('sha256').update(value).digest('hex');
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/0ioAAAAASUVORK5CYII=', 'base64');
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNgYGAAAAAEAAH2FzhVAAAAAElFTkSuQmCC', 'base64');
 
 function temp(t) {
   const root = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'hve-author-probe-'));
@@ -105,6 +105,12 @@ test('capture, brief and generated spec checks reject independent missing eviden
   structure(write);
   write('docs/images/eagledesk.png', png.subarray(0, -12));
   assert.match((await checkComposition(root, 'capture-container')).evidence, /final IEND|truncated/);
+  const badChecksum = Buffer.from(png);
+  badChecksum[41] ^= 1;
+  write('docs/images/eagledesk.png', badChecksum);
+  assert.match((await checkComposition(root, 'capture-container')).evidence, /checksum/);
+  write('docs/images/eagledesk.png', Buffer.concat([png, Buffer.from([0])]));
+  assert.match((await checkComposition(root, 'capture-container')).evidence, /no trailing bytes/);
   write('quests/07-probe/README.md', '\n');
   assert.match((await checkComposition(root, 'quest-briefs')).evidence, /07.*nonempty brief/);
   const procedural = 'evals/eagledesk-quests/eval.yaml';
@@ -127,6 +133,11 @@ test('composition rejects disconnected sources and nonlocal and out-of-output fr
   write('app/web/index.html', page.replace('src="c.js"', 'src="node_modules/c.js"'));
   write('app/web/node_modules/c.js', 'ProbeLogic.count();');
   assert.match((await checkComposition(root, 'tier-wiring')).evidence, /installed tooling/);
+  write('app/web/index.html', '<!doctype html><script type="module" src="main.mjs"></script>');
+  write('app/web/main.mjs', "import { count } from '../logic/b.mjs';\ncount();\n");
+  write('app/logic/b.mjs', "import { value } from '../store/a.mjs';\nexport const count = () => value;\n");
+  write('app/store/a.mjs', 'export const value = 1;\n');
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'pass');
 });
 
 test('composition distinguishes wrong evidence from incomplete licensing and provenance evidence', async t => {
@@ -362,25 +373,47 @@ test('Vally program adapters grade external local evidence and fail closed witho
   assert.equal(checked.passed, true, checked.evidence);
 });
 
-test('the full Vally behavioral grade accepts ordered synthetic evidence, but not a mock echo', async t => {
+test('Vally captures and grades all twelve mock turn diffs, but rejects a mock echo', async t => {
   const { root, write } = temp(t);
   const { MockExecutor } = await import('@microsoft/vally/executor/mock');
-  const { gradeTrajectory, loadEvalSpec } = await import('@microsoft/vally');
+  const { gradeTrajectory, loadEvalSpec, runEval } = await import('@microsoft/vally');
   const { stimuli: [stimulus] } = await loadEvalSpec(path.join(suite, 'behavioral.eval.yaml'));
   const graders = stimulus.graders.map(grader => grader.type === 'program' ? withAuthorPath(grader) : grader);
-  const trajectory = await new MockExecutor().execute(stimulus, { workDir: root, skills: [] });
-  const score = () => gradeTrajectory(trajectory, graders, { stimulus });
-  const echo = await score();
+  const mock = new MockExecutor();
+  const score = trajectory => gradeTrajectory(trajectory, graders, { stimulus });
+  const echoed = await mock.execute(stimulus, { workDir: root, skills: [] });
+  const echo = await score(echoed);
   assert.equal(echo.passed, false);
   assert.equal(echo.details.filter(detail => detail.passed).length, 0);
-  assert.equal(trajectory.metadata.executor, 'mock');
 
   frontend(write);
-  for (const quest of questIds) walkthrough(write, quest);
-  // The built-in mock executor does not observe stable turn completion or capture patches.
-  trajectory.turnDiffs = questIds.map((id, turn) => ({ turn, diff: additions(id) }));
-  trajectory.turnDiffs.at(-1).diff += '--- a/app/web/c.js\n+++ b/app/web/c.js\n';
-  const grade = await score();
+  const run = await runEval({
+    stimulus,
+    prompt: stimulus.turns[0],
+    skills: [],
+    workDir: root,
+    workspace: root,
+    executor: {
+      name: mock.name,
+      supportsMultiTurn: true,
+      supportsTurnCompletion: true,
+      async execute(stim, options) {
+        assert.equal(options.workDir, root);
+        for (const [turn, quest] of questIds.entries()) {
+          walkthrough(write, quest);
+          const final = turn === questIds.length - 1;
+          if (final) write('app/web/c.js', "document.querySelector('main').textContent = `Revised: ${ProbeLogic.count()}`;\n");
+          await options.onTurnComplete({ turn, status: 'completed', final });
+        }
+        return mock.execute(stim, options);
+      }
+    }
+  });
+  t.after(run.cleanup);
+  assert.equal(run.trajectory.metadata.executor, 'mock');
+  assert.deepEqual(run.trajectory.turnDiffs.map(({ turn, diff }) => [turn, typeof diff]),
+    questIds.map((_, turn) => [turn, 'string']));
+  const grade = await score(run.trajectory);
   assert.equal(grade.passed, true, `${grade.evidence}: ${grade.details.filter(detail => !detail.passed).map(d => d.evidence)}`);
   assert.equal(grade.details.filter(detail => detail.passed).length, 25);
   assert.equal(grade.details.filter(detail => detail.graderType === 'program').every(detail =>

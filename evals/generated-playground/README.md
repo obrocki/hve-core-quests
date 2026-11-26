@@ -14,7 +14,7 @@ npm run eval:composition -- 'C:\path\to\eligible-local-output'
 
 `HVE_QUEST_PLAYGROUND` can supply the same absolute path. Each of the [ten composition cases](composition.eval.yaml) reports its own `pass`, `fail`, `not-testable`, or `error` status. Exit `0` means all passed, `1` means evidence failed, and `2` means at least one result is unavailable or a checker could not run. An unresolved case is never a pass.
 
-The checks cover packaged readiness, exact checker and license copies, all twelve nonempty quest briefs, PNG container markers, the unstaged procedural eval, a connected local three-source path, offline startup, locked license evidence, all twelve clue/flag checks, and declared origin-scope coverage. The resource check traces relative imports and common classic-script global references; it is not a complete JavaScript or network audit. The license check recognizes common open license declarations in resolved npm lock entries; unsupported ecosystems, missing declarations and vendored assets need independent review. The inventory check cannot verify content origin, eligibility or distribution rights. PNG container evidence does not verify the actual screenshot.
+The checks cover packaged readiness, exact checker and license copies, all twelve nonempty quest briefs, PNG chunk framing and checksums, the unstaged procedural eval, a connected local three-source path, offline startup, locked license evidence, all twelve clue/flag checks plus a negative control, and declared origin-scope coverage. The resource check traces relative imports and common classic-script global references; it is not a complete JavaScript or network audit. The license check recognizes common open license declarations in resolved npm lock entries; unsupported ecosystems, missing declarations and vendored assets need independent review. The inventory check cannot verify content origin, eligibility or distribution rights. PNG container evidence does not verify the actual screenshot.
 
 For the browser case only, set `HVE_QUEST_CHROMIUM` to an absolute path to a trusted local Chromium-compatible executable. Use a disposable, network-isolated environment to open the program. The check uses a fresh offline browser context and a real `file:` URL; it observes visible startup, loaded local scripts, and request and page errors during startup. It does not exercise lookup, holds, expiry or conflict controls, which still require independent local observations. Without the browser the case is explicitly `not-testable`.
 
@@ -28,6 +28,20 @@ To inspect already collected local receipts without a Vally executor, use the sa
 
 The Vally program graders resolve the trusted author checker from the absolute `HVE_QUEST_AUTHOR_CHECKER` path to `program.cjs` in the separate author checkout. Composition reads `HVE_QUEST_PLAYGROUND`; behavior reads the Vally-provided workspace. Nothing is mounted by these specs. Turn-scoped assertions require captured per-turn diffs from a disposable workspace; a final diff or a plausible response is not equivalent.
 
-`npm test` (or `npm run test:generated` for just this suite) uses temporary, data-free positive and negative evidence. The installed Vally `MockExecutor` runs without a model; the behavioral probe provides synthetic per-turn diffs because MockExecutor does not capture turn boundaries. A passing mock proves only the grader and fixture contract. A planner probe also confirms that a non-mock selection is skipped before backend or executor work. Set `HVE_QUEST_TEST_CHROMIUM` to a local browser executable to additionally test offline startup and a script-failure case on a disposable static page.
+`npm test` (or `npm run test:generated` for just this suite) uses temporary, data-free positive and negative evidence. The installed Vally `MockExecutor` runs without a model but does not provide turn-completion callbacks. The behavioral test supplies stable callbacks for local test writes, so Vally captures and grades the actual resulting Git diffs; the stock mock CLI is not a substitute for this test. A passing mock proves only the grader and fixture contract. A planner probe confirms that a non-mock selection is skipped before backend or executor work. Set `HVE_QUEST_TEST_CHROMIUM` to a local browser executable to also test offline startup on a disposable static page.
 
 `npm run eval:lint` names all three specs separately because Vally 0.20.0 directory discovery misses the canonical `.eval.yaml` filenames and its lint command accepts only the last `--eval-spec`. Run the installed HVE Core `vally-tests` `Lint-VallyTestSafety.ps1` against both canonical specs when changing stimuli. The probes also check NFC normalization and SHA-256 dedupe across all specs.
+
+## Requested family profiles
+
+This is assignment metadata, not executable provider configuration, an effective routing record, or authorization. The same local tooling applies to every family.
+
+| Family | Requested generation profile | Requested test profile |
+|---|---|---|
+| Google | `gemini-4-neon`, `xhigh` (highest offered), `long_context` | `gemini-4-carbon`, medium |
+| Anthropic | `claude-opus-5.5`, max, `long_context` | `claude-sonnet-5.5`, medium |
+| OpenAI | `gpt-6.2-sol`, max, `long_context` | `gpt-6.1-terra`, medium |
+| Microsoft | `mai-code-2`, max, default context (no long selector offered) | `mai-code-2-flash`, medium |
+| Copilot Fusion | Auto (`hydrafusion-max` requested); effective model, tier and context not exposed | Auto Balance, medium requested; exact tier ID and route unverified |
+
+No playground was generated and no live quest ran under any profile. Vally's model, reasoning-effort and executor selectors do not establish actual provider, fallback, entitlement or context size. Do not substitute a different route or interpret mock results as live scores.

@@ -74,7 +74,7 @@ stimuli:
         Outcomes: reproduction, control, causal-limit.
       - |
         Quest 08, Security planning. Model the actual assets, trust boundaries and data flow for the
-        chosen slice. Relate risks to defensive controls and backlog proposals. Keep unresolved review
+        chosen slice. Relate plausible abuse cases to defensive controls and backlog proposals. Keep unresolved review
         and approval explicit; do not attempt attacks or make security changes in this planning step.
         Create the 08 walkthrough artifact and receipt.
         Outcomes: assets, trust-boundary, proposed-controls, approval-gate.

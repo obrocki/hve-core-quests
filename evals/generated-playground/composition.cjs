@@ -4,6 +4,7 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const { isDeepStrictEqual } = require('node:util');
+const { crc32 } = require('node:zlib');
 const { parse } = require('yaml');
 const {
   authorRoot, CheckError, requireEvidence, hasFields, playgroundDirectory, localItem,
@@ -57,20 +58,31 @@ function captureContainer(root) {
   const image = localItem(root, screenshot);
   const size = fs.statSync(image).size;
   requireEvidence(size >= 57, 'The PNG container is truncated.');
-  const header = Buffer.alloc(33);
-  const end = Buffer.alloc(12);
-  const handle = fs.openSync(image, 'r');
-  try {
-    fs.readSync(handle, header, 0, header.length, 0);
-    fs.readSync(handle, end, 0, end.length, size - end.length);
-  } finally {
-    fs.closeSync(handle);
+  if (size > 64 * 1024 * 1024) throw new CheckError('The PNG exceeds the local container inspection limit.', 'not-testable');
+  const bytes = fs.readFileSync(image);
+  requireEvidence(bytes.subarray(0, 8).toString('hex') === '89504e470d0a1a0a', 'Expected a PNG signature.');
+  let imageData = 0;
+  for (let start = 8; start + 12 <= bytes.length;) {
+    const length = bytes.readUInt32BE(start);
+    const type = bytes.toString('latin1', start + 4, start + 8);
+    const crcAt = start + 8 + length;
+    requireEvidence(crcAt + 4 <= bytes.length && /^[A-Za-z]{4}$/.test(type), 'The PNG has an invalid or truncated chunk.');
+    requireEvidence(bytes.readUInt32BE(crcAt) === crc32(bytes.subarray(start + 4, crcAt)), 'A PNG chunk checksum does not match.');
+    if (start === 8) {
+      requireEvidence(type === 'IHDR' && length === 13 && bytes.readUInt32BE(16) > 0 && bytes.readUInt32BE(20) > 0,
+        'Expected an initial IHDR chunk with nonzero dimensions.');
+    } else {
+      requireEvidence(type !== 'IHDR', 'The PNG has a repeated IHDR chunk.');
+      if (type === 'IDAT') imageData += length;
+      if (type === 'IEND') {
+        requireEvidence(length === 0 && crcAt + 4 === bytes.length && imageData > 0,
+          'The PNG needs image data and a final empty IEND chunk with no trailing bytes.');
+        return 'PNG chunk framing and checksums passed; pixels and capture authenticity were not verified.';
+      }
+    }
+    start = crcAt + 4;
   }
-  requireEvidence(header.subarray(0, 8).toString('hex') === '89504e470d0a1a0a' &&
-    header.readUInt32BE(8) === 13 && header.toString('ascii', 12, 16) === 'IHDR' &&
-    header.readUInt32BE(16) > 0 && header.readUInt32BE(20) > 0 && end.toString('hex') === '0000000049454e44ae426082',
-  'Expected PNG signature, image dimensions and a final IEND chunk.');
-  return 'PNG container markers are present; neither pixels nor capture authenticity were verified.';
+  throw new CheckError('The PNG is missing a final IEND chunk.');
 }
 
 async function proceduralSuite(root) {
@@ -210,11 +222,19 @@ function clueDiscovery(root) {
     foreach ($flag in $flags) {
       & $env:HVE_PACK_FLAG_CHECKER -OutputPath $env:HVE_CHECK_ROOT -Quest $flag.quest -Flag $flag.value | Out-Null
     }
+    $rejected = $false
+    try {
+      & $env:HVE_PACK_FLAG_CHECKER -OutputPath $env:HVE_CHECK_ROOT -Quest $flags[0].quest -Flag ($flags[0].value + '-negative-control') | Out-Null
+    } catch {
+      if ($_.Exception.Message -cne 'Flag does not match.') { throw }
+      $rejected = $true
+    }
+    if (-not $rejected) { throw 'The negative flag control was accepted.' }
   `], JSON.stringify(flags), {
     HVE_PACK_FLAG_CHECKER: path.join(pack, assets['scripts/Test-QuestFlag.ps1']),
     HVE_CHECK_ROOT: root
   }, 'Pack flag checks');
-  return 'All twelve local marker hashes and packaged flag checks passed; this is discovery only.';
+  return 'All twelve local marker hashes matched, and the trusted flag checker rejected the negative control. This is discovery only.';
 }
 
 function unseededInventory(root) {
