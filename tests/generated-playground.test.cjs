@@ -387,6 +387,29 @@ test('the full Vally behavioral grade accepts ordered synthetic evidence, but no
     detail.metadata.native === 'not-testable' && detail.metadata.semantic === 'uncalibrated'), true);
 });
 
+test('Vally skips both canonical specs for a non-mock executor before any backend work', async () => {
+  const { createDefaultConfig, loadEvalSpec, planRun, ProjectContext, runTrialItem } = await import('@microsoft/vally');
+  const specs = await Promise.all(['composition', 'behavioral'].map(async name => {
+    const filePath = path.join(suite, `${name}.eval.yaml`);
+    return { filePath, spec: await loadEvalSpec(filePath) };
+  }));
+  const unexpected = () => assert.fail('An excluded executor must not enter a backend or start a session.');
+  const executor = { name: 'copilot-sdk', execute: unexpected, shutdown: unexpected };
+  const plan = await planRun({
+    variants: [{ name: 'no-live-lane', specs }],
+    projectCtx: new ProjectContext(createDefaultConfig()),
+    models: [undefined],
+    executor: executor.name,
+    getExecutor: () => executor
+  });
+  assert.deepEqual(plan.evals.map(evalPlan => [evalPlan.plannedStimulusCount, evalPlan.skippedStimulusCount]),
+    [[0, compositionChecks.length], [0, 1]]);
+  const unused = new Proxy({}, { get: unexpected });
+  const results = await Promise.all(plan.items.map(item => runTrialItem(item, unused, unused)));
+  assert.equal(results.length, compositionChecks.length + 1);
+  assert.ok(results.every(result => result.status === 'skipped' && result.trajectory === null && result.grade === null));
+});
+
 test('suite specs contain no staged material and dedupe all prompt and turn text by normalized SHA-256', () => {
   const old = parse(fs.readFileSync(path.join(repo, 'evals', 'eagledesk-quests', 'eval.yaml'), 'utf8'));
   const composition = spec('composition');
