@@ -1,0 +1,211 @@
+name: generated-playground-behavior
+description: Twelve ordered quest turns with turn-scoped artifact creation and deterministic evidence-shape grading.
+type: capability
+defaults:
+  runs: 1
+scoring:
+  threshold: 1
+stimuli:
+  - name: generated-workshop-walkthrough
+    supported_executors: [copilot-sdk]
+    tags:
+      advisory: "true"
+    turns:
+      - |
+        Quest 01, Documentation. Work only in an already eligible, isolated local playground.
+        If the required workspace or permission is absent, report the blocker instead of seeking example inputs.
+        Write a launch guide that accurately separates the file-based frontend from optional connected services.
+        Name what the reader can verify locally and what remains unknown.
+
+        For each turn NN, create .hve-walkthrough/NN.md with the deliverable and .hve-walkthrough/NN.json
+        with the numeric quest, artifact (ready or blocked), gates (native, human, runtime, each one of
+        not-run, blocked or reported), limits (an array of limitations), and outcomes (an object).
+        Use the turn's named outcome keys. Each value has a finding in your own words and sources,
+        a nonempty array of {path, line} locators to supporting local source outside .hve-walkthrough.
+        A locator is output-relative with a one-based line number. Cite app/web/index.html for launch.
+        For discovery, use path and line locators and do not repeat clue values or workshop records.
+        Do not say a native action, human decision, or runtime observation happened unless it did.
+        Use locally available procedures only where applicable. Do not mutate external services or deploy.
+        Finish this turn before starting the next; do not write future quest artifacts early.
+        Outcomes: launch, offline-boundary, verified-behavior.
+      - |
+        Quest 02, Research. Start from the previous launch guide. Trace a supported lookup or hold from
+        its UI entry through actual application logic to storage and back. Cite distinct real source
+        files for those three roles; distinguish behavior observed in the source from absent capability,
+        unanswered questions and any unperformed run. Create the 02 walkthrough artifact and receipt.
+        Outcomes: presentation, application, data, unknowns.
+      - |
+        Quest 03, User empathy. Use the local invented roles as evidence for an inclusive journey or
+        sketch involving the traced workflow. Relate different role needs to concrete friction or
+        accommodations, label assumptions, and say what would need human validation. Create the 03
+        walkthrough artifact and receipt.
+        Outcomes: roles, journey, inclusion, unvalidated.
+      - |
+        Quest 04, Requirements. Translate the journey's top concern into proposed measurable outcomes
+        with an owner role, scope, exclusions, failure and unchanged behavior acceptance criteria.
+        Identify one first-ranked slice and why; separate a proposal from approval. Create the 04
+        walkthrough artifact and receipt.
+        Outcomes: measure, scope, failure, first-slice.
+      - |
+        Quest 05, Backlog. Decompose the first slice into ordered dependent work with acceptance criteria.
+        Record what would be necessary to resolve a tracker platform and project; without a confirmed
+        native path produce a labeled tracker-neutral plan and do not create remote items. Create the 05
+        walkthrough artifact and receipt.
+        Outcomes: priority, dependencies, acceptance, tracker-gate.
+      - |
+        Quest 06, Architecture and ADR. Compare meaningful alternatives for the first slice and record
+        a justified, bounded decision. Show which layers are executable now, which snippets are inert
+        history, and what is optional. Create the 06 walkthrough artifact and receipt.
+        Outcomes: alternatives, decision, runtime-boundary.
+      - |
+        Quest 07, Root cause. If eligible local execution is available, run the controlled conflict
+        reproduction and a non-conflicting or serialized control. Explain the difference, strongest
+        supported causal claim, and what neither run demonstrates. Do not present an illustration as
+        execution. Create the 07 walkthrough artifact and receipt. For observed runs, supply runs with
+        conflict and control objects, each with command, integer exit and boolean detected. Mark runtime
+        unavailable if actual observation is missing.
+        Outcomes: reproduction, control, causal-limit.
+      - |
+        Quest 08, Security planning. Model the actual assets, trust boundaries and data flow for the
+        chosen slice. Relate risks to defensive controls and backlog proposals. Keep unresolved review
+        and approval explicit; do not attempt attacks or make security changes in this planning step.
+        Create the 08 walkthrough artifact and receipt.
+        Outcomes: assets, trust-boundary, proposed-controls, approval-gate.
+      - |
+        Quest 09, Supply chain. Inventory what the executable path and optional tooling actually depend
+        on. Identify the license, version, build and provenance evidence available locally and unresolved
+        package or asset questions. Do not imply verification for uninspected components. Create the 09
+        walkthrough artifact and receipt.
+        Outcomes: inventory, licenses, build-evidence, limits.
+      - |
+        Quest 10, Accessibility and privacy. Review the real keyboard workflow, status feedback and
+        stored data. Note what you actually observed, suggest safeguards, and retain unperformed
+        assistive technology, conformance or privacy checks. If native profile prerequisites are
+        unavailable, label the fallback. Create the 10 walkthrough artifact and receipt.
+        Outcomes: keyboard, status, data-flow, safeguards, unperformed.
+      - |
+        Quest 11, Responsible AI and experiment design. Establish whether the current app has an actual
+        AI subsystem. Give a grounded decision not to proceed when there is no justified experiment,
+        or propose an unapproved experiment with a measurable outcome, safeguards and stop rules.
+        Explain evidence or conditions for reconsideration. Create the 11 walkthrough artifact and receipt.
+        Outcomes: feature-assessment, decision, reconsideration.
+      - |
+        Quest 12, Implementation, review and reporting. Use the preceding evidence to research and plan
+        one bounded slice. Run a focused behavioral regression check that fails for the intended reason
+        before the fix; change the app, rerun the same check, and run an existing check for preserved
+        behavior. Review the diff and prepare a board-facing evidence summary, including limitations.
+        Work only in a disposable local checkout; record blockers honestly. Create the 12 walkthrough
+        artifact and receipt. For observed runs, supply runs with red, green and regression objects,
+        each with command and integer exit.
+        Outcomes: small-slice, regression, review, report.
+    graders:
+      - type: program
+        name: generated-quest-01-artifact
+        config:
+          program: node
+          args:
+            - -e
+            - &dispatch >-
+              const checker = process.env.HVE_QUEST_AUTHOR_CHECKER;
+              if (!checker || !require("node:path").isAbsolute(checker)) throw new Error("Trusted local checker path required.");
+              require(checker).runVally(process.argv.slice(1));
+            - behavior
+            - "01"
+      - type: diff-contains
+        name: generated-quest-01-turn-creation
+        turn: 0
+        config:
+          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/01\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/01\.json\r?$)'
+      - type: program
+        name: generated-quest-02-artifact
+        config: { program: node, args: [-e, *dispatch, behavior, "02"] }
+      - type: diff-contains
+        name: generated-quest-02-turn-creation
+        turn: 1
+        config:
+          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/02\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/02\.json\r?$)'
+      - type: program
+        name: generated-quest-03-artifact
+        config: { program: node, args: [-e, *dispatch, behavior, "03"] }
+      - type: diff-contains
+        name: generated-quest-03-turn-creation
+        turn: 2
+        config:
+          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/03\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/03\.json\r?$)'
+      - type: program
+        name: generated-quest-04-artifact
+        config: { program: node, args: [-e, *dispatch, behavior, "04"] }
+      - type: diff-contains
+        name: generated-quest-04-turn-creation
+        turn: 3
+        config:
+          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/04\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/04\.json\r?$)'
+      - type: program
+        name: generated-quest-05-artifact
+        config: { program: node, args: [-e, *dispatch, behavior, "05"] }
+      - type: diff-contains
+        name: generated-quest-05-turn-creation
+        turn: 4
+        config:
+          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/05\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/05\.json\r?$)'
+      - type: program
+        name: generated-quest-06-artifact
+        config: { program: node, args: [-e, *dispatch, behavior, "06"] }
+      - type: diff-contains
+        name: generated-quest-06-turn-creation
+        turn: 5
+        config:
+          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/06\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/06\.json\r?$)'
+      - type: program
+        name: generated-quest-07-artifact
+        config: { program: node, args: [-e, *dispatch, behavior, "07"] }
+      - type: diff-contains
+        name: generated-quest-07-turn-creation
+        turn: 6
+        config:
+          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/07\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/07\.json\r?$)'
+      - type: program
+        name: generated-quest-08-artifact
+        config: { program: node, args: [-e, *dispatch, behavior, "08"] }
+      - type: diff-contains
+        name: generated-quest-08-turn-creation
+        turn: 7
+        config:
+          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/08\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/08\.json\r?$)'
+      - type: program
+        name: generated-quest-09-artifact
+        config: { program: node, args: [-e, *dispatch, behavior, "09"] }
+      - type: diff-contains
+        name: generated-quest-09-turn-creation
+        turn: 8
+        config:
+          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/09\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/09\.json\r?$)'
+      - type: program
+        name: generated-quest-10-artifact
+        config: { program: node, args: [-e, *dispatch, behavior, "10"] }
+      - type: diff-contains
+        name: generated-quest-10-turn-creation
+        turn: 9
+        config:
+          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/10\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/10\.json\r?$)'
+      - type: program
+        name: generated-quest-11-artifact
+        config: { program: node, args: [-e, *dispatch, behavior, "11"] }
+      - type: diff-contains
+        name: generated-quest-11-turn-creation
+        turn: 10
+        config:
+          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/11\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/11\.json\r?$)'
+      - type: program
+        name: generated-quest-12-artifact
+        config: { program: node, args: [-e, *dispatch, behavior, "12"] }
+      - type: diff-contains
+        name: generated-quest-12-turn-creation
+        turn: 11
+        config:
+          pattern: '(?m)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/12\.md\r?$)(?=[\s\S]*^--- /dev/null\r?\n\+\+\+ b/\.hve-walkthrough/12\.json\r?$)'
+      - type: diff-contains
+        name: generated-quest-12-application-change
+        turn: 11
+        config:
+          pattern: '(?m)^\+\+\+ b/app/[^\r\n]+\.(?:html|css|[cm]?js)\r?$'

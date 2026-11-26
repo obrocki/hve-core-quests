@@ -1,0 +1,73 @@
+name: generated-playground-composition
+description: Offline program graders for local composition evidence. Prompts are labels, not evidence.
+type: capability
+defaults:
+  executor: mock
+  runs: 1
+stimuli:
+  - name: generated-structural-readiness
+    prompt: Inspect the local output for its required workshop structure and procedural suite.
+    graders:
+      - type: program
+        name: generated-readiness
+        config:
+          program: node
+          timeout: 3m
+          args:
+            - -e
+            - &dispatch >-
+              const checker = process.env.HVE_QUEST_AUTHOR_CHECKER;
+              if (!checker || !require("node:path").isAbsolute(checker)) throw new Error("Trusted local checker path required.");
+              require(checker).runVally(process.argv.slice(1));
+            - composition
+            - readiness
+  - name: generated-pack-integrity
+    prompt: Compare the installed checkers and license to their bundled originals.
+    graders:
+      - type: program
+        name: generated-pack-byte-identity
+        config:
+          program: node
+          args: [-e, *dispatch, composition, pack-integrity]
+  - name: generated-three-tier-wiring
+    prompt: Find a connected local resource path from the frontend to logic to storage.
+    graders:
+      - type: program
+        name: generated-local-tier-chain
+        config:
+          program: node
+          args: [-e, *dispatch, composition, tier-wiring]
+  - name: generated-offline-startup
+    prompt: Observe startup of the file URL in a fresh offline browser context.
+    graders:
+      - type: program
+        name: generated-browser-startup
+        config:
+          program: node
+          timeout: 90s
+          args: [-e, *dispatch, composition, offline-startup]
+  - name: generated-dependency-evidence
+    prompt: Audit declarations and resolved lock entries for open license evidence.
+    graders:
+      - type: program
+        name: generated-locked-license-evidence
+        config:
+          program: node
+          args: [-e, *dispatch, composition, dependency-evidence]
+  - name: generated-clue-discovery
+    prompt: Validate the marker manifest and run the trusted flag checker for each quest.
+    graders:
+      - type: program
+        name: generated-twelve-discovery-checks
+        config:
+          program: node
+          timeout: 3m
+          args: [-e, *dispatch, composition, clue-discovery]
+  - name: generated-unseeded-inventory
+    prompt: Review local declaration and scope coverage without asserting clearance or origin.
+    graders:
+      - type: program
+        name: generated-unseeded-origin-coverage
+        config:
+          program: node
+          args: [-e, *dispatch, composition, unseeded-inventory]

@@ -66,7 +66,7 @@ npm run eval:lint
 npm test
 ```
 
-`eval:lint` validates the [twelve procedural Vally cases](evals/eagledesk-quests/eval.yaml) without running probes. `npm test` exercises safeguards offline. The supported `npm run eval` entry **stops before model contact**: no trusted binding establishes the effective service/model and fallback for this executor. No environment switch enables it. Do not stage old fixtures or run a runner directly as a substitute.
+`eval:lint` validates the [twelve procedural Vally cases](evals/eagledesk-quests/eval.yaml) and the [author-only generated-playground suites](evals/generated-playground/README.md) without running agents. `npm test` exercises safeguards and graders offline. The supported `npm run eval` entry **stops before model contact**: no trusted binding establishes the effective service/model and fallback for this executor. No environment switch enables it. Do not stage old fixtures or run a runner directly as a substitute.
 
 To inspect a separately generated local output:
 
