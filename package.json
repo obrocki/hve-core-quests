@@ -12,6 +12,7 @@
     "test": "node --test tests/workshop-safeguards.test.cjs tests/generated-playground.test.cjs"
   },
   "devDependencies": {
+    "@microsoft/vally": "0.20.0",
     "@microsoft/vally-cli": "0.20.0",
     "acorn": "8.19.0",
     "parse5": "8.1.1",
