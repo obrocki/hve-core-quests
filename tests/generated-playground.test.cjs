@@ -184,6 +184,45 @@ test('composition traces browser-global wrappers and explicit factory injection,
   assert.equal((await checkComposition(root, 'tier-wiring')).status, 'fail');
 });
 
+test('composition resolves classic injection origins by lexical binding', async t => {
+  const { root, write } = temp(t);
+  write('app/web/index.html', page);
+  write('app/store/a.js', 'window.LocalValues = { read: () => 1 };\n');
+  write('app/logic/b.js', 'window.LocalLogic = { create: storage => ({ read: () => storage.read() }) };\n');
+  const cases = [
+    ['bare exports from earlier classic scripts', 'const store = LocalValues; LocalLogic.create({ storage: store });', 'pass'],
+    ['separate locals with the same name', `
+      const store = window.LocalValues;
+      window.LocalLogic.create(store);
+      function unrelated() { let store = {}; store = {}; }
+    `, 'pass'],
+    ['a write to the actual outer binding', `
+      let store = window.LocalValues;
+      function replace() { store = {}; }
+      replace();
+      window.LocalLogic.create(store);
+    `, 'fail'],
+    ['an IIFE parameter shadowing an outer origin', `
+      const store = window.LocalValues;
+      (function (store) { window.LocalLogic.create(store); })({});
+    `, 'fail'],
+    ['an IIFE name shadowing an outer origin', `
+      const store = window.LocalValues;
+      (function store() { window.LocalLogic.create(store); })();
+    `, 'fail'],
+    ['a block binding shadowing a bare export', `
+      { const LocalValues = {}; LocalLogic.create(LocalValues); }
+    `, 'fail']
+  ];
+  for (const [label, script, status] of cases) {
+    await t.test(label, async () => {
+      write('app/web/c.js', script);
+      const result = await checkComposition(root, 'tier-wiring');
+      assert.equal(result.status, status, result.evidence);
+    });
+  }
+});
+
 test('composition distinguishes wrong evidence from incomplete licensing and provenance evidence', async t => {
   const { root, write } = temp(t);
   const clues = structure(write);

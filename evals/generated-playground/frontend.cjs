@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { fileURLToPath, pathToFileURL } = require('node:url');
 const acorn = require('acorn');
+const { analyze } = require('eslint-scope');
 const { parse } = require('parse5');
 const { CheckError, requireEvidence, inside, localItem, readText } = require('./local-files.cjs');
 
@@ -17,42 +18,6 @@ const installedTooling = relative => relative.split('/').some(part => part.toLow
 const browserGlobals = new Set(['window', 'globalThis', 'self']);
 const functionValue = node => ['FunctionExpression', 'ArrowFunctionExpression'].includes(node?.type);
 
-function browserReceiver(node, globals) {
-  if (node?.type === 'Identifier') return globals.has(node.name);
-  if (node?.type === 'ThisExpression') return true;
-  return node?.type === 'ConditionalExpression' &&
-    browserReceiver(node.consequent, globals) && browserReceiver(node.alternate, globals);
-}
-
-function globalProperty(node, globals) {
-  if (node?.type !== 'MemberExpression' || node.object.type !== 'Identifier' || !globals.has(node.object.name)) return;
-  const key = node.computed ? node.property.value : node.property.name;
-  return typeof key === 'string' ? key : undefined;
-}
-
-function nameAt(node, globals) {
-  if (node?.type === 'Identifier') return node.name;
-  if (node?.type !== 'MemberExpression') return;
-  return globalProperty(node, globals) ?? nameAt(node.object, globals);
-}
-
-function originOf(node, globals, bindings) {
-  if (node?.type === 'Identifier') return bindings.get(node.name);
-  if (node?.type === 'MemberExpression') return globalProperty(node, globals) ?? originOf(node.object, globals, bindings);
-  if (['CallExpression', 'NewExpression'].includes(node?.type)) return originOf(node.callee, globals, bindings);
-}
-
-function bindingNames(pattern) {
-  switch (pattern?.type) {
-    case 'Identifier': return [pattern.name];
-    case 'ObjectPattern': return pattern.properties.flatMap(property => bindingNames(property.type === 'RestElement' ? property : property.value));
-    case 'ArrayPattern': return pattern.elements.flatMap(bindingNames);
-    case 'AssignmentPattern': return bindingNames(pattern.left);
-    case 'RestElement': return bindingNames(pattern.argument);
-    default: return [];
-  }
-}
-
 function walkChildren(node, visit) {
   for (const value of Object.values(node)) {
     if (Array.isArray(value)) value.forEach(visit);
@@ -60,27 +25,63 @@ function walkChildren(node, visit) {
   }
 }
 
-function unstableBindings(ast) {
-  const declared = new Set();
-  const unstable = new Set();
-  const visit = node => {
-    if (!node || typeof node.type !== 'string') return;
-    if (node.type === 'VariableDeclarator') {
-      for (const name of bindingNames(node.id)) {
-        if (declared.has(name)) unstable.add(name);
-        declared.add(name);
-      }
+function staticReference(reference) {
+  if (!reference || reference.tainted) return false;
+  for (let scope = reference.from; scope; scope = scope.upper) {
+    if (scope.type === 'with' || scope.directCallToEvalScope) return false;
+  }
+  return true;
+}
+
+function scriptBindings(ast) {
+  const scopeManager = analyze(ast, { sourceType: ast.sourceType, ecmaVersion: 2025, optimistic: true });
+  const references = new WeakMap();
+  const overwrittenGlobals = new Set();
+  const origins = new Map();
+  const browserAliases = new Set();
+  for (const scope of scopeManager.scopes) {
+    for (const reference of scope.references) {
+      references.set(reference.identifier, reference);
+      if (!reference.resolved && reference.isWrite()) overwrittenGlobals.add(reference.identifier.name);
     }
-    if (['AssignmentExpression', 'UpdateExpression', 'ForInStatement', 'ForOfStatement'].includes(node.type)) {
-      const target = node.left ?? node.argument;
-      const names = target.type === 'VariableDeclaration'
-        ? target.declarations.flatMap(item => bindingNames(item.id)) : bindingNames(target);
-      names.forEach(name => unstable.add(name));
+  }
+
+  function stableDeclaration(node, identifier) {
+    if (identifier?.type !== 'Identifier') return;
+    const binding = scopeManager.getDeclaredVariables(node).find(variable => variable.identifiers.includes(identifier));
+    if (binding?.identifiers.length === 1 && !binding.references.some(reference => reference.isWrite() && !reference.init)) {
+      return binding;
     }
-    walkChildren(node, visit);
-  };
-  visit(ast);
-  return unstable;
+  }
+
+  function browserReceiver(node) {
+    if (node?.type === 'ThisExpression') return true;
+    if (node?.type === 'ConditionalExpression') return browserReceiver(node.consequent) && browserReceiver(node.alternate);
+    const reference = references.get(node);
+    if (!staticReference(reference)) return false;
+    return reference.resolved ? browserAliases.has(reference.resolved)
+      : browserGlobals.has(node.name) && !overwrittenGlobals.has(node.name);
+  }
+
+  function globalProperty(node) {
+    if (node?.type !== 'MemberExpression' || node.object.type !== 'Identifier' || !browserReceiver(node.object)) return;
+    const key = node.computed ? node.property.value : node.property.name;
+    return typeof key === 'string' ? key : undefined;
+  }
+
+  function originOf(node) {
+    if (node?.type === 'Identifier') {
+      const reference = references.get(node);
+      if (!staticReference(reference)) return;
+      if (reference.resolved) return origins.get(reference.resolved);
+      // Only the graph can match an unresolved identifier to a unique earlier classic script export.
+      if (!browserGlobals.has(node.name) && !overwrittenGlobals.has(node.name)) return node.name;
+    }
+    if (node?.type === 'MemberExpression') return globalProperty(node) ?? originOf(node.object);
+    if (['CallExpression', 'NewExpression'].includes(node?.type)) return originOf(node.callee);
+  }
+
+  return { scopeManager, stableDeclaration, browserReceiver, globalProperty, originOf, origins, browserAliases };
 }
 
 function inspectFrontend(root) {
@@ -127,7 +128,7 @@ function inspectFrontend(root) {
     if (scripts.has(id)) return;
     let ast;
     try {
-      ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: module ? 'module' : 'script' });
+      ast = acorn.parse(source, { ecmaVersion: 'latest', sourceType: module ? 'module' : 'script', ranges: true });
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
       throw new CheckError('A runnable browser script has invalid JavaScript syntax.');
@@ -139,82 +140,40 @@ function inspectFrontend(root) {
     scripts.set(id, { provides, uses, module, injections });
     edges.set(id, dependencies);
 
+    const { scopeManager, stableDeclaration, browserReceiver, globalProperty, originOf, origins, browserAliases } = scriptBindings(ast);
     for (const statement of ast.body) {
-      if (statement.type === 'VariableDeclaration') {
-        for (const item of statement.declarations) bindingNames(item.id).forEach(name => provides.add(name));
-      } else if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') {
-        provides.add(statement.id?.name);
+      for (const declaration of scopeManager.getDeclaredVariables(statement)) {
+        if (declaration.scope === scopeManager.globalScope) provides.add(declaration.name);
       }
     }
     // A classic script can publish its API through an IIFE's global-object parameter.
     const wrappers = new Set(module ? [] : ast.body.map(statement => statement.expression)
       .filter(node => node?.type === 'CallExpression' && functionValue(node.callee)));
-    const unstable = unstableBindings(ast);
-    const walk = (node, globals, bindings) => {
+    const walk = node => {
       if (!node || typeof node.type !== 'string') return;
-      if (node.type === 'Program' || node.type === 'BlockStatement') {
-        const scopedGlobals = new Set(globals);
-        const local = new Map(bindings);
-        for (const child of node.body) {
-          const names = child.type === 'VariableDeclaration' ? child.declarations.flatMap(item => bindingNames(item.id))
-            : ['FunctionDeclaration', 'ClassDeclaration'].includes(child.type) ? bindingNames(child.id) : [];
-          for (const name of names) {
-            scopedGlobals.delete(name);
-            local.delete(name);
-          }
-        }
-        for (const child of node.body) {
-          if (child.type === 'VariableDeclaration') {
-            for (const declaration of child.declarations) {
-              walk(declaration, scopedGlobals, local);
-              const { id: binding, init } = declaration;
-              const origin = originOf(init, scopedGlobals, local);
-              if (binding.type === 'Identifier' && origin !== undefined && !unstable.has(binding.name)) {
-                local.set(binding.name, origin);
-              }
-            }
-          } else walk(child, scopedGlobals, local);
-        }
-        return;
-      }
-      if (functionValue(node) || node.type === 'FunctionDeclaration') {
-        const shadowed = new Set([...node.params.flatMap(bindingNames), ...bindingNames(node.id)]);
-        const scopedGlobals = new Set([...globals].filter(name => !shadowed.has(name)));
-        const local = new Map([...bindings].filter(([name]) => !shadowed.has(name)));
-        node.params.forEach(param => walk(param, scopedGlobals, local));
-        walk(node.body, scopedGlobals, local);
-        return;
-      }
       if (wrappers.has(node)) {
-        node.arguments.forEach(arg => walk(arg, globals, bindings));
-        const wrappedGlobals = new Set(globals);
-        for (const name of node.callee.params.flatMap(bindingNames)) wrappedGlobals.delete(name);
         node.callee.params.forEach((param, index) => {
-          if (param.type === 'Identifier' && !unstable.has(param.name) && browserReceiver(node.arguments[index], globals)) {
-            wrappedGlobals.add(param.name);
-          }
+          const binding = stableDeclaration(node.callee, param);
+          if (binding && browserReceiver(node.arguments[index])) browserAliases.add(binding);
         });
-        node.callee.params.forEach(param => walk(param, wrappedGlobals, bindings));
-        walk(node.callee.body, wrappedGlobals, bindings);
-        return;
       }
       if (node.type === 'CallExpression' || node.type === 'NewExpression') {
-        uses.add(nameAt(node.callee, globals));
-        const application = originOf(node.callee, globals, bindings);
+        const application = originOf(node.callee);
+        uses.add(application);
         if (application) {
           for (const arg of node.arguments) {
             const values = arg.type === 'ObjectExpression'
               ? arg.properties.filter(property => property.type === 'Property' && property.kind === 'init').map(property => property.value)
               : [arg];
             for (const value of values) {
-              const data = originOf(value, globals, bindings);
+              const data = originOf(value);
               if (data && data !== application) injections.push([application, data]);
             }
           }
         }
       }
-      if (node.type === 'MemberExpression') uses.add(nameAt(node, globals));
-      if (node.type === 'AssignmentExpression') provides.add(globalProperty(node.left, globals));
+      if (node.type === 'MemberExpression') uses.add(originOf(node));
+      if (node.type === 'AssignmentExpression') provides.add(globalProperty(node.left));
 
       if (['ImportDeclaration', 'ExportAllDeclaration', 'ExportNamedDeclaration', 'ImportExpression']
         .includes(node.type) && node.source) {
@@ -226,9 +185,14 @@ function inspectFrontend(root) {
         dependencies.add(imported);
         if (/\.[cm]?js$/i.test(imported)) inspectScript(imported, imported, readText(root, imported), true);
       }
-      walkChildren(node, child => walk(child, globals, bindings));
+      walkChildren(node, walk);
+      if (node.type === 'VariableDeclarator') {
+        const binding = stableDeclaration(node, node.id);
+        const origin = originOf(node.init);
+        if (binding && origin !== undefined) origins.set(binding, origin);
+      }
     };
-    walk(ast, browserGlobals, new Map());
+    walk(ast);
     uses.delete(undefined);
     provides.delete(undefined);
   };
