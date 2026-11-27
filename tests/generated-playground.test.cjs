@@ -115,6 +115,8 @@ test('capture, brief and generated spec checks reject independent missing eviden
   assert.match((await checkComposition(root, 'quest-briefs')).evidence, /07.*nonempty brief/);
   const procedural = 'evals/eagledesk-quests/eval.yaml';
   const original = fs.readFileSync(path.join(repo, procedural), 'utf8');
+  write(procedural, original.replace('name: offline-boundary', 'name: quest-01-offline-boundary'));
+  assert.equal((await checkComposition(root, 'procedural-suite')).status, 'pass');
   write(procedural, `${original}\nagent_environment: {}\n`);
   assert.match((await checkComposition(root, 'procedural-suite')).evidence, /fixture setup/);
 });
@@ -217,6 +219,24 @@ test('composition distinguishes wrong evidence from incomplete licensing and pro
   assert.match((await checkComposition(root, 'clue-discovery')).evidence, /duplicate or ambiguous JSON/);
 });
 
+test('author discovery accepts the same standalone comment syntax as the packaged readiness checker', async t => {
+  const { root, write } = temp(t);
+  const clues = structure(write);
+  clues[0].file = 'app/probe.vbs';
+  clues[1].file = 'docs/probe.html';
+  clues[2].file = 'app/web/probe.css';
+  write('quests/clues.json', clues);
+  write(clues[0].file, "\t' marker-01: probe-1\r\n");
+  write(clues[1].file, '<!-- marker-02: probe-2 -->\n');
+  write(clues[2].file, '/* marker-03: probe-3 */\n');
+  const wrapped = await checkComposition(root, 'clue-discovery');
+  assert.equal(wrapped.status, 'pass', wrapped.evidence);
+  write(clues[1].file, '<!-- marker-02: probe-2\n');
+  assert.match((await checkComposition(root, 'clue-discovery')).evidence, /correctly formatted marker line/);
+  write(clues[1].file, '<!-- marker-02: probe-2 --> trailing text\n');
+  assert.match((await checkComposition(root, 'clue-discovery')).evidence, /correctly formatted marker line/);
+});
+
 test('dependency metadata separates SHA-1 integrity gaps from license gaps and corroborates only bound entries', async t => {
   const { root, write } = temp(t);
   structure(write);
@@ -233,6 +253,31 @@ test('dependency metadata separates SHA-1 integrity gaps from license gaps and c
   const weak = await check({ ...known, integrity: sha1 });
   assert.equal(weak.status, 'not-testable');
   assert.match(weak.evidence, /0 license, 1 integrity, 1 SHA-1 only, 0 identity/);
+  assert.match(weak.evidence, /Integrity not established.*README disclosure missing/);
+  const readme = '[Begin](quests/01-probe/README.md)\n';
+  write('README.md', `${readme}\nDependency licenses: recognized\nDependency integrity: not established\nSHA-1-only entries: 1\n`);
+  const disclosed = await check({ ...known, integrity: sha1 });
+  assert.equal(disclosed.status, 'not-testable');
+  assert.match(disclosed.evidence, /README disclosure present/);
+  assert.equal((await checkComposition(root, 'quest-briefs')).status, 'pass');
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'pass');
+  write('README.md', `${readme}\nDependency integrity: pass\nDependency integrity: not established\n`);
+  assert.match((await check({ ...known, integrity: sha1 })).evidence, /README disclosure missing or conflicting/);
+  write('README.md', `${readme}\n~~~text\nDependency integrity: not established\n~~~\n`);
+  assert.match((await check({ ...known, integrity: sha1 })).evidence, /README disclosure missing or conflicting/);
+  const readSync = fs.readFileSync;
+  const reference = require('../package-lock.json');
+  const authorLockPath = path.join(repo, 'package-lock.json');
+  const mockAuthorLock = t.mock.method(fs, 'readFileSync', (file, ...args) => file === authorLockPath
+    ? JSON.stringify({ packages: { ...reference.packages, [location]: { ...known, integrity: `${sha1} ${known.integrity}` } } })
+    : readSync(file, ...args));
+  try {
+    const corroborated = await check({ ...known, integrity: sha1 });
+    assert.equal(corroborated.status, 'not-testable');
+    assert.match(corroborated.evidence, /1 integrity, 1 SHA-1 only/);
+  } finally {
+    mockAuthorLock.mock.restore();
+  }
   const malformed = await check({ ...known, integrity: 'sha512-YQ==' });
   assert.equal(malformed.status, 'not-testable');
   assert.match(malformed.evidence, /0 license, 1 integrity, 0 SHA-1 only/);

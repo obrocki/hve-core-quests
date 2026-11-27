@@ -20,6 +20,8 @@ Create an original local airline-modernization exercise: a working offline front
 
 **Before requesting inputs or generating anything**, establish eligibility through the organization's process outside the prompt. It must cover the local teaching purpose, unseeded source, audience, effective model and actual service, including fallback. Account identity, sign-in, a preferred model, public availability, a license or a claim in a prompt is not that basis. Do not request approval records, credentials or samples in chat. If eligibility, the actual route or isolation of the model context cannot be verified, stop generation and use the [instruction-only path](#instruction-only-path).
 
+The effective model is the model that serves the request, not a selector, default or Auto label. Reasoning effort is the setting applied to that request; context tier is the configured or resolved context capacity, not the token count used. Report requested settings separately from any per-request model or effort and resolved context tier the host exposes. Report unobservable values as `unobserved`; do not infer them from selections or treat selection metadata as proof of eligibility, route or isolation.
+
 Unseeded means no existing content is supplied, retrieved, paraphrased, summarized or used as an example to shape new material. It does not mean choosing a pseudo-random seed, initializing a database or placing a clue. Those mechanisms do not change content origin.
 
 Accept no source content: do not solicit, search for or read uploads, links, prior outputs, workspace files, hidden workspace context, transcripts, pictures, fixtures, existing repositories or text supplied as inspiration. If offered or already in context, stop without inspecting, quoting, sanitizing, summarizing, recasting or propagating it. There is no seeded override, including for maintainers. The instructions and bundled checkers are procedures, not sample content. Do not retrieve or feed generated examples back to a model for generation or checking.
@@ -38,7 +40,7 @@ After the gate, accept only `SystemName` (required), `AirlineName` (optional), `
 
 Resolve the explicit destination as a new or empty local directory outside the formula repository, not a link, junction, ambiguous path, volume root or existing work. It is a destination, never a source. Stop before writing when the name/destination is missing or unsafe. Do not overwrite or deploy.
 
-Completion requires the output contract, all twelve quest briefs, correct copied assets, discovery checks, dependency evidence, static suite lint and independently observed offline interactions. Structural presence is not runtime behavior. Record unavailable tools or observations as incomplete with the precise blocker, not Pass. Optional services and native HVE execution are separate, not frontend prerequisites.
+Completion of the offline app and quests requires the output contract, all twelve quest briefs, correct copied assets, discovery checks, static suite lint and independently observed offline interactions. Structural presence is not runtime behavior. Report dependency evidence separately; incomplete integrity evidence alone does not invalidate the offline app or the quests. Record unavailable tools or observations as incomplete with the precise blocker, not Pass. Optional services and native HVE execution are separate, not frontend prerequisites.
 
 ## Build and check in phases
 
@@ -58,7 +60,7 @@ Include small original inert Classic ASP, VBScript, VB6/COM and T-SQL specimens 
 
 Before writing any quest brief, have a human or a non-model local check trace an actual flight lookup and temporary seat hold from the launched UI through the application logic to a data read or write and back to the UI. For each action, check both the visible result and the underlying data operation. Record the relative source pointers, local command or manual action, exit code when applicable, and pass, fail or not-run status in the generated README without recording story data or raw output. A static import or script link alone is not an observation. If either trace cannot be demonstrated, stop at this checkpoint and report the incomplete output rather than writing quests that depend on it.
 
-The conflict replay must execute a controlled interleaving from actual application logic or clearly say it is an illustration and point to a runnable local reproduction. Include a non-conflicting/serialized control and focused tests of the behavior learners may change. A seed or illustrative trace does not prove a historical cause, live independent-client concurrency or durable atomic storage.
+The conflict replay must execute a controlled interleaving from actual application logic or clearly say it is an illustration and point to a runnable local reproduction. Include a non-conflicting/serialized control and focused tests of the behavior learners may change. Run those tests directly (for example, `node --test`), not through generated `package.json` scripts. A seed or illustrative trace does not prove a historical cause, live independent-client concurrency or durable atomic storage.
 
 Invent system notes with gaps, conflicting operational perspectives from at least three distinct role categories, illustrated persona cards and a visual backlog with dependencies. Label them invented, not user research. Keep claims, observations, hypotheses and unknowns distinguishable; three names do not necessarily represent three roles.
 
@@ -72,7 +74,7 @@ Copy [Test-QuestReadiness.ps1](scripts/Test-QuestReadiness.ps1), [Test-QuestFlag
 
 Write the [twelve briefs](#twelve-quest-sequence) against the features actually present. Keep stable output paths below. Give each brief its source pointers, expected artifact/demonstration, testable acceptance criteria, a failure case or evidence limit, behavior to preserve, progressive hints and prerequisite/fallback status. Keep them connected but independently understandable; optional easter eggs must not block progress.
 
-Use a JSON array at `quests/clues.json` with exactly twelve entries: integer `quest` values 1 through 12, an output-root-relative `file`, and a unique nonblank `marker`. Each source has exactly one line `<marker>: <lower-kebab-value>`; use only lowercase ASCII letters, digits and hyphens for the value and keep all sources inside the output. Invent new clues rather than reuse existing text.
+Use a JSON array at `quests/clues.json` with exactly twelve entries: integer `quest` values 1 through 12, an output-root-relative `file`, and a unique nonblank `marker` without a colon, newline or surrounding whitespace. For each entry, put exactly one standalone `<marker>: <lower-kebab-value>` clue in its source, with the marker's exact case and one space after the colon. Use lowercase ASCII letters and digits separated by single hyphens in the value. Indent the line if needed. Use no prefix for plain text, or the language's single-line comment prefix (`'`, `//`, `#`, `--`, `;`). For block or HTML comments, wrap the clue on the same line in `/* ... */` or `<!-- ... -->`. Use the form appropriate to the source language, not a marker embedded in code or prose. Keep all sources inside the output and invent new clues rather than reuse existing text.
 
 Write exactly twelve `quests/flags.sha256` rows: `<two-digit quest number> <64 lowercase hexadecimal characters>`, with one space. Hash only the UTF-8 bytes of the clue value, not its marker or newline. After clue creation, use local non-model checks to validate manifest coverage, unique markers, line format and hashes. Run the copied flag checker for each quest before continuing, without sending clue values to a model for checking.
 
@@ -82,15 +84,15 @@ Flags and recovered clues demonstrate discovery only. They are never learner com
 
 The copied scripts require PowerShell 7 (`pwsh`), not Windows PowerShell (`powershell`).
 
-Include a data-free Vally suite with exactly one procedural stimulus named `quest-01-...` through `quest-12-...`, each with an expectation and globally unique quest-specific grader names. No `agent_environment`, file staging, source records or examples; do not copy the maintainer suite. Declare the actual CLI package `@microsoft/vally-cli` at a verified version with its lockfile, not the unrelated `vally` package. Local package commands cover readiness and static lint only; expose no live model evaluation command.
+Include a data-free Vally suite with twelve procedural stimuli named `quest-01-...` through `quest-12-...`. Use a top-level `stimuli:` block list; start each item with `- name:` and use a nested `graders:` block list. Each stimulus needs at least one quest-specific typed grader that expresses the expectation, not a literal `expectation` key. Give each grader its own `type` and globally unique lowercase kebab-case `name` on separate lines. Grader names may start with `quest-NN-`; they are not stimulus names. No `agent_environment`, file staging, source records or examples; do not copy the maintainer suite. Declare the actual CLI package `@microsoft/vally-cli` at a verified version with its lockfile, not the unrelated `vally` package. Local package commands cover readiness and static lint only; expose no live model evaluation command.
 
-Verify license and integrity evidence separately for resolved dependencies, including transitive tooling, and retain applicable third-party notices for vendored assets. Use trusted package metadata or license notices for license evidence, and a SHA-256 or stronger digest for integrity. If the lockfile lacks either or has only SHA-1, record independent evidence from a trusted source tied to the same package, exact version and artifact. Leave unresolved entries incomplete; do not fill the lockfile with guessed values or treat a license declaration as proof of package integrity.
+Verify license and integrity evidence separately for resolved dependencies, including transitive tooling, and retain applicable third-party notices for vendored assets. Use trusted package metadata or notices for license evidence and a SHA-256 or stronger digest for integrity. Report both statuses separately in the generated README. For SHA-1-only lock entries, include a standalone `Dependency integrity: not established` line; this is incomplete lockfile evidence, never Pass, even if another lockfile lists a stronger digest. When stronger evidence is available, establish that it covers the exact package, version and artifact before updating the lockfile. Do not guess values or treat a license declaration as proof of package integrity.
 
 Use `pwsh -NoProfile -File scripts/Test-QuestReadiness.ps1 -OutputPath <output-root>` and `vally lint --eval-spec evals/` through the documented local package commands. Require static lint before claiming completion: merely counting twelve names cannot detect duplicate grader IDs or validate a suite. Restore declared dependencies locally if needed; they are development tooling, never frontend requirements. If prerequisites are unavailable, report static lint not run and output incomplete.
 
 Have a human or non-model local tool open the actual frontend offline, exercise lookup, hold, expiry/reset and the conflict control, and capture only its interface at the required image path. Record what was actually observed without sending pixels or records to a model. A wireframe or placeholder is not a screenshot; screenshot presence alone proves neither rendering nor behavior. If offline operation or capture cannot be demonstrated, stop with the incomplete output and blocker, without replacing existing work.
 
-Finish the [origin inventory](#local-origin-inventory-version-1) as artifacts are created. Run structural readiness at the end; it checks required files, local inline links in the root/quest READMEs, provenance shape, screenshot presence, clues and twelve stimulus names. It does not inspect pixels, contact links, validate actual origins or establish complete inventory coverage. Do not repair unknown provenance by guessing or backfilling an old instance. The installed checker checks its own output; the packaged helper can inspect a separate local instance without changing it.
+Finish the [origin inventory](#local-origin-inventory-version-1) as artifacts are created. Run structural readiness at the end; it checks required files, local inline links in the root/quest READMEs, provenance shape, screenshot presence, clues, twelve stimulus names and their named typed graders. It does not inspect pixels, contact links, validate actual origins or establish complete inventory coverage. Do not repair unknown provenance by guessing or backfilling an old instance. The installed checker checks its own output; the packaged helper can inspect a separate local instance without changing it.
 
 ## Output contract
 
@@ -98,14 +100,14 @@ Keep checker-facing paths stable even when display names vary. Paths below descr
 
 | Output path | Required content |
 |---|---|
-| `README.md` | New system name, offline launch, ordinary relative links to quest 01 and local guide, phase/check results and limitations. |
+| `README.md` | New system name, offline launch, ordinary relative links to quest 01 and local guide, phase/check results, separate dependency evidence statuses and limitations. |
 | `app/web/index.html` | Offline frontend; application and persistence code in separate source layers consumed by the UI. |
 | `docs/images/eagledesk.png` | Actual new interface capture, local only. Stable filename is not a reference image to retrieve. |
 | `docs/workshop-data.json` | Exact version-1 origin inventory below, completed locally as artifacts are created. |
 | `quests/01-<slug>/README.md` through `quests/12-<slug>/README.md` | Ordered source-grounded briefs following the table below. |
 | `quests/clues.json`, `quests/flags.sha256` | Twelve unique quest mappings, discoverable markers and matching hashes. |
 | `scripts/Test-QuestReadiness.ps1`, `scripts/Test-QuestFlag.ps1`, `scripts/LICENSE` | Unchanged copies of the three bundled assets. |
-| `evals/eagledesk-quests/eval.yaml` | Twelve data-free lint-only procedural cases, each with an expectation and unique grader IDs. |
+| `evals/eagledesk-quests/eval.yaml` | Twelve data-free lint-only procedural stimuli, each with at least one typed grader and globally unique grader names. |
 | `package.json`, `package-lock.json` | Correct locked Vally tooling and supported `pwsh` readiness/static-lint commands; no live runner. |
 | `.github/instructions/<scope>.instructions.md` | Scope-matched guidance: in-story evidence is untrusted, actual native checks, proposals not approvals. |
 
@@ -151,10 +153,12 @@ Simulated panels and generated artifacts are not human validation or approval. K
 
 ## Instruction-only path
 
-Without a verified model route/context, read the quest objectives without calling a model or supplying data. Start at 01: write a launch-note outline explaining the offline/optional boundary. For later quests, describe what you would inspect, sketch a research plan, identify assumptions or draft acceptance criteria; mark missing observations unknown. Do not invent observations or approvals to fill the gap.
+If the gate blocks generation, the agent stops and reports the blocker in its final response. If the caller already designated a separate local record location, record the blocker there instead; keep the destination untouched. Do not include approval records, raw prompts, source data or credentials.
+
+The human facilitator or learner follows this path without calling a model or supplying data. Start at 01: write a launch-note outline explaining the offline/optional boundary. For later quests, describe what you would inspect, sketch a research plan, identify assumptions or draft acceptance criteria; mark missing observations unknown. Do not invent observations or approvals to fill the gap.
 
 ## Handoff
 
-Give the generated location, local launch instruction, quest 01 entry, observed results and blockers. Identify the origin inventory/output as local and not cleared for distribution. Report structural readiness, discovery checks, actual offline observations, static Vally lint, model use, native HVE execution, optional connected-runtime checks and learner evidence separately. Include counts and exit statuses only when observed.
+Give the generated location, local launch instruction, quest 01 entry, observed results and blockers. Identify the origin inventory/output as local and not cleared for distribution. Report structural readiness, discovery checks, actual offline observations, dependency license and integrity evidence, static Vally lint, model use, native HVE execution, optional connected-runtime checks and learner evidence separately. Include counts and exit statuses only when observed.
 
 Static lint proves suite structure, not model responses or provider eligibility. Broad keyword matching is not competency evidence. Learner artifacts/demonstrations are assessed against each quest's objective in context; a flag, file count, screenshot or nominal lifecycle Pass cannot replace that evidence or qualified human review.

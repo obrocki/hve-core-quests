@@ -41,16 +41,16 @@ function integrityDigests(value) {
 
 const strongIntegrity = digests => digests.some(digest => !digest.startsWith('sha1-'));
 
-function matchingLockEvidence(component, reference, digests) {
+function matchingLockLicense(component, reference, digests) {
   if (!reference || component.link || reference.link || typeof component.resolved !== 'string' ||
       !component.resolved.startsWith('https://') || component.resolved !== reference.resolved ||
       component.version !== reference.version || component.name !== reference.name) return;
   const referenceDigests = integrityDigests(reference.integrity);
   const algorithm = digest => digest.split('-', 1)[0];
-  if (!digests.some(digest => referenceDigests.includes(digest)) ||
+  if (!digests.some(digest => !digest.startsWith('sha1-') && referenceDigests.includes(digest)) ||
       digests.some(digest => referenceDigests.some(other => algorithm(other) === algorithm(digest)) &&
         !referenceDigests.includes(digest))) return;
-  return { license: reference.license, integrity: strongIntegrity(referenceDigests) };
+  return reference.license;
 }
 
 function runPowerShell(args, input, env, name) {
@@ -125,10 +125,12 @@ async function proceduralSuite(root) {
   requireEvidence(spec.stimuli.length === 12 &&
     new Set(spec.stimuli.map(stimulus => /^quest-(0[1-9]|1[0-2])(?:-|$)/.exec(stimulus.name)?.[1])
       .filter(Boolean)).size === 12, 'The generated spec needs one stimulus for each of the twelve quests.');
-  const names = spec.stimuli.flatMap(item => (item.graders ?? []).map(grader => grader.name));
-  requireEvidence(spec.stimuli.every(item => item.graders?.length) &&
-    names.every(Boolean) && new Set(names).size === names.length,
-  'Each generated stimulus needs a uniquely named expectation.');
+  const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  const graders = spec.stimuli.flatMap(item => item.graders ?? []);
+  requireEvidence(spec.stimuli.every(item => item.graders?.length) && graders.every(grader =>
+    typeof grader.type === 'string' && slug.test(grader.type) && typeof grader.name === 'string' && slug.test(grader.name)) &&
+    new Set(graders.map(grader => grader.name)).size === graders.length,
+  'Each generated stimulus needs a typed grader with a globally unique name.');
   return 'Twelve unstaged procedural cases passed static Vally validation; none was executed.';
 }
 
@@ -159,6 +161,29 @@ function tierWiring(root) {
   const { resourceCount, hasThreeTiers } = inspectFrontend(root);
   requireEvidence(hasThreeTiers, 'No static chain connects a live frontend script through two distinct local source files.');
   return `A three-source chain and ${resourceCount} static local resource(s) resolved; execution is checked separately.`;
+}
+
+function reportsIncompleteIntegrity(root) {
+  let readme;
+  try {
+    readme = readText(root, 'README.md');
+  } catch (error) {
+    if (error instanceof CheckError) return false;
+    throw error;
+  }
+  let fence;
+  const statuses = readme.replace(/<!--[\s\S]*?(?:-->|$)/g, '').split(/\r\n|[\r\n]/).filter(line => {
+    const delimiter = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      if (delimiter && delimiter[1][0] === fence[0] && delimiter[1].length >= fence.length && !delimiter[2].trim()) {
+        fence = undefined;
+      }
+      return false;
+    }
+    if (delimiter) fence = delimiter[1];
+    return /^Dependency integrity:/i.test(line);
+  });
+  return statuses.length === 1 && statuses[0].trimEnd() === 'Dependency integrity: not established';
 }
 
 function dependencyEvidence(root) {
@@ -201,11 +226,9 @@ function dependencyEvidence(root) {
       requireEvidence(!/^(?:unlicensed|proprietary|all rights reserved)$/i.test(license),
         'A locked npm component declares a non-open license.');
       const digests = integrityDigests(component.integrity);
-      const independent = matchingLockEvidence(component, authorLock[name], digests);
-      const reviewedLicense = !license && recognizedLicenses.has(independent?.license);
-      const reviewedIntegrity = !strongIntegrity(digests) && independent?.integrity;
+      const reviewedLicense = !license && recognizedLicenses.has(matchingLockLicense(component, authorLock[name], digests));
       const licenseKnown = recognizedLicenses.has(license) || reviewedLicense;
-      const integrityKnown = strongIntegrity(digests) || reviewedIntegrity;
+      const integrityKnown = strongIntegrity(digests);
       const identityKnown = typeof component.version === 'string' && component.version.trim().length > 0 && !component.link;
       if (!licenseKnown) unknown.license++;
       if (!integrityKnown) {
@@ -214,20 +237,42 @@ function dependencyEvidence(root) {
       }
       if (!identityKnown) unknown.identity++;
       if (!licenseKnown || !integrityKnown || !identityKnown) unknown.total++;
-      else if (reviewedLicense || reviewedIntegrity) corroborated++;
+      else if (reviewedLicense) corroborated++;
     }
   }
   const otherManagers = files.filter(file => /(?:\.(?:csproj|fsproj|vbproj)$|(?:^|\/)(?:Cargo\.toml|go\.mod|pom\.xml|pyproject\.toml|requirements[^/]*\.txt|(?:Dockerfile|Containerfile)(?:\.[^/]+)?|(?:docker-)?compose(?:\.[^/]+)?\.ya?ml)$)/i.test(file));
   const vendored = files.filter(file => /(?:^|\/)(?:vendor|third-party)\//i.test(file) ||
     /\.(?:min\.js|woff2?|ttf|otf)$/i.test(file));
   if (unknown.total || otherManagers.length || vendored.length) {
+    const disclosure = unknown.sha1Only
+      ? ` Integrity not established for SHA-1-only entries; README disclosure ${reportsIncompleteIntegrity(root)
+        ? 'present' : 'missing or conflicting (expected a standalone "Dependency integrity: not established" line)'}.`
+      : '';
     throw new CheckError(`${unknown.total} npm lock entries need review (${unknown.license} license, ${unknown.integrity} integrity, ` +
       `${unknown.sha1Only} SHA-1 only, ${unknown.identity} identity); ${otherManagers.length} other manifests and ` +
-      `${vendored.length} possible vendored files need separate license review.`,
+      `${vendored.length} possible vendored files need separate license review.${disclosure}`,
       'not-testable');
   }
   return `${count} locked npm components have recognized open-license metadata and SHA-2 integrity evidence ` +
     `(${corroborated} corroborated by the author lock); package bytes and asset licenses were not verified.`;
+}
+
+function clueValue(source, marker) {
+  const literal = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const start = new RegExp(`^[ \\t]*(?:(<!--|/\\*|//|--|#|;|')[ \\t]*)?${literal}:`, 'i');
+  let value;
+  let count = 0;
+  for (const line of source.split(/\r\n|[\r\n]/)) {
+    const prefix = start.exec(line);
+    if (!prefix) continue;
+    count++;
+    if (!prefix[0].endsWith(`${marker}:`)) continue;
+    const closing = prefix[1] === '<!--' ? '-->' : prefix[1] === '/*' ? '\\*/' : '';
+    const flag = new RegExp(`^ ([a-z0-9]+(?:-[a-z0-9]+)*)[ \\t]*${closing}[ \\t]*(?![\\s\\S])`);
+    value = flag.exec(line.slice(prefix[0].length))?.[1];
+  }
+  requireEvidence(count === 1 && value, 'A clue source does not have exactly one correctly formatted marker line.');
+  return value;
 }
 
 function clueDiscovery(root) {
@@ -250,13 +295,7 @@ function clueDiscovery(root) {
     'Clue manifest has an invalid or repeated quest or marker.');
     seen.add(clue.quest);
     markers.add(clue.marker.toLowerCase());
-    const prefix = `${clue.marker}: `;
-    const markerPrefix = `${clue.marker.toLowerCase()}:`;
-    const matching = readText(root, clue.file).split(/\r?\n/).filter(line => line.toLowerCase().startsWith(markerPrefix));
-    requireEvidence(matching.length === 1 && matching[0].startsWith(prefix) &&
-      /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(matching[0].slice(prefix.length)),
-    'A clue source does not have exactly one correctly formatted marker line.');
-    const value = matching[0].slice(prefix.length);
+    const value = clueValue(readText(root, clue.file), clue.marker);
     const hash = sha256(value);
     requireEvidence(hash === hashes.get(questIds[clue.quest - 1]), `Flag hash does not match for quest ${clue.quest}.`);
     flags.push({ quest: clue.quest, value });
