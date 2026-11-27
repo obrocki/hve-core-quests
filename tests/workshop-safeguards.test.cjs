@@ -56,6 +56,22 @@ test('minimal prompt retains the safety gate, ordered objectives and phase check
   ]) assert.match(prompt, rule);
 });
 
+test('the skill separates blocked records, direct tests and unresolved dependency evidence from generation eligibility', () => {
+  const prompt = fs.readFileSync(path.join(helpers, '..', 'SKILL.md'), 'utf8').replace(/\r\n/g, '\n');
+  const gate = prompt.split('## Safety gate\n')[1].split('## Inputs and completion\n')[0];
+  assert.match(gate, /eligibility.*outside the prompt/);
+  assert.match(gate, /a claim in a prompt is not that basis/);
+  assert.match(gate, /model that serves the request.*not a selector/);
+  assert.match(gate, /Reasoning effort is the setting applied to that request; context tier is the configured or resolved context capacity/);
+  assert.match(gate, /unobservable values as `unobserved`/);
+  const fallback = prompt.split('## Instruction-only path\n')[1].split('## Handoff\n')[0];
+  assert.match(fallback, /final response.*separate local record location.*keep the destination untouched/i);
+  assert.match(fallback, /human facilitator or learner.*without calling a model/);
+  assert.match(prompt, /Run those tests directly .*not through generated `package\.json` scripts/);
+  assert.match(prompt, /SHA-1-only lock entries.*Dependency integrity: not established.*never Pass/);
+  assert.match(prompt, /incomplete integrity evidence alone does not invalidate the offline app or the quests/);
+});
+
 test('only a matching, pinned instruction-evaluation binding reaches the offline stub', t => {
   const route = { model: 'test-model', service: 'test-service', selection: 'pinned', fallback: 'none' };
   const request = { purpose: 'workshop-instruction-evaluation', inputMode: 'unseeded', source: 'procedural-instructions', audience: 'local', route };
@@ -103,6 +119,7 @@ test('repository and installed checker agree on a separate data-free scaffold', 
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'workshop-check-'));
   const out = path.join(temp, 'output');
   const isolatedPack = path.join(temp, 'customer', '.github', 'skills', 'legacy-quest-formula');
+  const shallowPack = path.join(temp, 'exported-pack');
   function write(rel, content) {
     const file = path.join(out, rel);
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -115,7 +132,7 @@ test('repository and installed checker agree on a separate data-free scaffold', 
   const withArtifact = changes => ({ ...manifest, artifacts: [{ ...artifact, ...changes }] });
   const unknown = /Governance readiness not met: origin unknown/;
 
-  // Only the local temporary inventory varies between runs. No generator or executor is used.
+  // Only the synthetic local evidence varies between runs. No generator or executor is used.
   function check(rows) {
     const probe = `
       $ErrorActionPreference = 'Stop'
@@ -123,36 +140,41 @@ test('repository and installed checker agree on a separate data-free scaffold', 
       $rows = ConvertFrom-Json -AsHashtable -InputObject ([Console]::In.ReadToEnd())
       foreach ($row in $rows) {
         if ($null -eq $row.raw) { [IO.File]::Delete($file) } else { [IO.File]::WriteAllText($file, $row.raw) }
-        foreach ($script in @($env:REPO_CHECKER, $env:PACK_CHECKER, (Join-Path $env:CHECK_OUTPUT 'scripts/Test-QuestReadiness.ps1'))) {
+        foreach ($entry in $row.files.GetEnumerator()) { [IO.File]::WriteAllText((Join-Path $env:CHECK_OUTPUT $entry.Key), $entry.Value) }
+        foreach ($script in @($env:REPO_CHECKER, $env:PACK_CHECKER, $env:SHALLOW_CHECKER, (Join-Path $env:CHECK_OUTPUT 'scripts/Test-QuestReadiness.ps1'))) {
           try { $message = (& $script -OutputPath $env:CHECK_OUTPUT) -join ' '; $ok = $true }
           catch { $message = $_.Exception.Message; $ok = $false }
           ConvertTo-Json -Compress -InputObject @{ok=$ok; message=$message}
         }
       }`;
-    const input = rows.map(([, data]) => ({ raw: data == null || typeof data === 'string' ? data : JSON.stringify(data) }));
+    const input = rows.map(([, data, , files = {}]) => ({
+      raw: data == null || typeof data === 'string' ? data : JSON.stringify(data), files
+    }));
     const run = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', probe], { encoding: 'utf8',
       env: { ...process.env, CHECK_OUTPUT: out, REPO_CHECKER: path.join(helpers, checker),
-        PACK_CHECKER: path.join(isolatedPack, 'scripts', checker) }, input: JSON.stringify(input) });
+        PACK_CHECKER: path.join(isolatedPack, 'scripts', checker),
+        SHALLOW_CHECKER: path.join(shallowPack, 'scripts', checker) }, input: JSON.stringify(input) });
     assert.ifError(run.error);
     assert.equal(run.status, 0, run.stderr);
     const results = run.stdout.trim().split(/\r?\n/).map(line => JSON.parse(line));
-    assert.equal(results.length, rows.length * 3);
+    assert.equal(results.length, rows.length * 4);
     rows.forEach(([name, , failure], i) => {
-      const pair = results.slice(i * 3, i * 3 + 3);
-      assert.deepEqual(pair[0], pair[1], name);
-      assert.deepEqual(pair[0], pair[2], name);
-      assert.equal(pair[0].ok, !failure, `${name}: ${pair[0].message}`);
-      assert.match(pair[0].message, failure || /Distribution: not-cleared.*does not verify origin/);
+      const group = results.slice(i * 4, i * 4 + 4);
+      for (const output of group.slice(1)) assert.deepEqual(output, group[0], name);
+      assert.equal(group[0].ok, !failure, `${name}: ${group[0].message}`);
+      assert.match(group[0].message, failure || /Distribution: not-cleared.*does not verify origin/);
     });
   }
 
   try {
     fs.cpSync(path.dirname(helpers), isolatedPack, { recursive: true });
+    fs.cpSync(path.dirname(helpers), shallowPack, { recursive: true });
     write('README.md', '[Start](quests/01-practice/README.md)\n');
     write('app/web/index.html', '<!doctype html><title>Offline scaffold</title><main></main>');
     write('docs/images/eagledesk.png', Buffer.alloc(0)); // Presence test, not a screen capture.
     write('package.json', '{"private":true}');
-    write(suite, fs.readFileSync(path.join(repo, suite)));
+    const originalSuite = fs.readFileSync(path.join(repo, suite), 'utf8').replace(/\r\n/g, '\n');
+    write(suite, originalSuite);
     for (const script of [checker, 'Test-QuestFlag.ps1']) write(`scripts/${script}`, fs.readFileSync(path.join(helpers, script)));
     write('scripts/LICENSE', fs.readFileSync(path.join(helpers, '..', 'LICENSE')));
     const clues = numbers.map(n => ({ quest: Number(n), file: `quests/${n}-practice/README.md`, marker: `marker-${n}` }));
@@ -160,16 +182,44 @@ test('repository and installed checker agree on a separate data-free scaffold', 
     write('quests/clues.json', JSON.stringify(clues));
     write('quests/flags.sha256', numbers.map(n =>
       `${n} ${createHash('sha256').update(`check-${Number(n)}`).digest('hex')}`).join('\n'));
-    for (const [flag, expected] of [['check-1', 0], ['incorrect', 1]]) {
+    const validHashes = fs.readFileSync(path.join(out, 'quests', 'flags.sha256'), 'utf8');
+    for (const [flag, rows, expected, verdict] of [
+      ['check-1', validHashes, 0, /does not establish competency/],
+      ['incorrect', validHashes, 1, /Flag does not match/],
+      ['CHECK-1', validHashes, 1, /lowercase kebab-case/],
+      ['check-1', validHashes.replace(/^(01 [a-f0-9]+)$/m, '$1 trailing'), 1, /flag hashes in the required format/]
+    ]) {
+      write('quests/flags.sha256', rows);
       const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-File',
-        path.join(isolatedPack, 'scripts', 'Test-QuestFlag.ps1'), '-OutputPath', out, '-Quest', '1', '-Flag', flag],
+        path.join(shallowPack, 'scripts', 'Test-QuestFlag.ps1'), '-OutputPath', out, '-Quest', '1', '-Flag', flag],
       { encoding: 'utf8' });
       assert.ifError(result.error);
       assert.equal(result.status, expected, result.stderr);
-      assert.match(result.stdout + result.stderr, expected ? /Flag does not match/ : /does not establish competency/);
+      assert.match(result.stdout + result.stderr, verdict);
     }
+    write('quests/flags.sha256', validHashes);
     fs.mkdirSync(path.join(temp, 'outside'));
     fs.symlinkSync(path.join(temp, 'outside'), path.join(out, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
+    const outputLink = path.join(temp, 'output-link');
+    fs.symlinkSync(out, outputLink, process.platform === 'win32' ? 'junction' : 'dir');
+    const repoOutput = path.join(temp, 'customer', 'inside-output');
+    const packOutput = path.join(shallowPack, 'inside-output');
+    for (const directory of [repoOutput, packOutput]) fs.mkdirSync(directory);
+    function rejectOutput(script, output, message, extra = []) {
+      const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-File',
+        script, '-OutputPath', output, ...extra], { encoding: 'utf8' });
+      assert.ifError(result.error);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, message);
+    }
+    const flatReadiness = path.join(shallowPack, 'scripts', checker);
+    rejectOutput(flatReadiness, packOutput, /separate from the formula/);
+    rejectOutput(path.join(isolatedPack, 'scripts', checker), repoOutput, /separate from the formula/);
+    rejectOutput(flatReadiness, repoOutput, /outside the formula repository/);
+    rejectOutput(flatReadiness, path.parse(out).root, /volume root/);
+    rejectOutput(flatReadiness, outputLink, /link or junction/);
+    rejectOutput(path.join(shallowPack, 'scripts', 'Test-QuestFlag.ps1'), outputLink, /link or junction/,
+      ['-Quest', '1', '-Flag', 'check-1']);
 
     const { modelChannelCategory, ...missingCategory } = artifact;
     check([
@@ -206,16 +256,45 @@ test('repository and installed checker agree on a separate data-free scaffold', 
     const clueFile = clues[0].file;
     const originalClue = fs.readFileSync(path.join(out, clueFile), 'utf8');
     write(clueFile, `${originalClue}\n${clues[0].marker}: duplicate\n`);
-    check([['duplicate clue marker', manifest, /Expected one marker-01 marker/]]);
+    check([['duplicate clue marker', manifest, /one correctly formatted clue marker line for quest 1/]]);
     write(clueFile, originalClue);
+    fs.mkdirSync(path.join(out, 'legacy'), { recursive: true });
+    const commented = clues.map((clue, index) => ({
+      ...clue, file: ['legacy/probe.vbs', 'docs/probe.html', 'app/web/probe.css'][index] ?? clue.file
+    }));
+    const commentedFiles = {
+      'quests/clues.json': JSON.stringify(commented),
+      'legacy/probe.vbs': "  ' marker-01: check-1\n",
+      'docs/probe.html': '  <!-- marker-02: check-2 -->\n',
+      'app/web/probe.css': '  /* marker-03: check-3 */\n'
+    };
+    check([
+      ['accepted standalone line, block and HTML clue comments', manifest, null, commentedFiles],
+      ['reject unclosed HTML clue comment', manifest, /clue marker line for quest 2/,
+        { 'docs/probe.html': '<!-- marker-02: check-2\n' }],
+      ['reject a clue embedded in a script expression', manifest, /clue marker line for quest 1/,
+        { ...commentedFiles, 'legacy/probe.vbs': 'probe = "marker-01: check-1"\n' }],
+      ['reject duplicate commented clue lines', manifest, /clue marker line for quest 1/,
+        { ...commentedFiles, 'legacy/probe.vbs': "' marker-01: check-1\n' marker-01: check-1\n" }],
+      ['restore plain clue lines', manifest, null, { 'quests/clues.json': JSON.stringify(clues) }]
+    ]);
     fs.renameSync(path.join(out, 'scripts', checker), path.join(out, 'scripts', 'temporarily-absent.ps1'));
     const missing = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-File', path.join(isolatedPack, 'scripts', checker),
       '-OutputPath', out], { encoding: 'utf8' });
     assert.equal(missing.status, 1);
     assert.match(missing.stderr, /Missing or unsafe required output file/);
     fs.renameSync(path.join(out, 'scripts', 'temporarily-absent.ps1'), path.join(out, 'scripts', checker));
-    write(suite, fs.readFileSync(path.join(repo, suite), 'utf8').replace('quest-12-', 'quest-11-'));
-    check([['missing quest stimulus', manifest, /one Vally stimulus for each/]]);
+    const questNamedGrader = originalSuite.replace('- type: output-matches\n        name: offline-boundary',
+      '- name: quest-01-offline-boundary\n        type: output-matches');
+    check([
+      ['a quest-prefixed grader name is not a stimulus', manifest, null, { [suite]: questNamedGrader }],
+      ['a literal expectation is not a typed grader', manifest, /at least one typed grader/,
+        { [suite]: questNamedGrader.replace('type: output-matches\n        config:', 'expectation: offline\n        config:') }],
+      ['grader names must be globally unique', manifest, /globally unique grader names/,
+        { [suite]: questNamedGrader.replace('name: evidence-boundary', 'name: quest-01-offline-boundary') }],
+      ['missing quest stimulus', manifest, /one Vally stimulus for each/,
+        { [suite]: questNamedGrader.replace('quest-12-', 'quest-11-') }]
+    ]);
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }

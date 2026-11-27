@@ -95,7 +95,7 @@ test('Vally MockExecutor and all composition graders leave an unconfigured brows
     seen.push([detail.metadata?.check, detail.metadata?.status, detail.evidence]);
   }
   assert.deepEqual(seen.map(([check, status]) => [check, status]), compositionChecks.map(check =>
-    [check, check === 'offline-startup' ? 'not-testable' : 'pass']), JSON.stringify(seen));
+    [check, check === 'offline-startup' ? 'not-run' : 'pass']), JSON.stringify(seen));
   assert.equal((await checkComposition(undefined, 'readiness')).status, 'not-testable');
   assert.equal((await checkComposition(repo, 'readiness')).status, 'fail');
 });
@@ -115,6 +115,8 @@ test('capture, brief and generated spec checks reject independent missing eviden
   assert.match((await checkComposition(root, 'quest-briefs')).evidence, /07.*nonempty brief/);
   const procedural = 'evals/eagledesk-quests/eval.yaml';
   const original = fs.readFileSync(path.join(repo, procedural), 'utf8');
+  write(procedural, original.replace('name: offline-boundary', 'name: quest-01-offline-boundary'));
+  assert.equal((await checkComposition(root, 'procedural-suite')).status, 'pass');
   write(procedural, `${original}\nagent_environment: {}\n`);
   assert.match((await checkComposition(root, 'procedural-suite')).evidence, /fixture setup/);
 });
@@ -125,6 +127,7 @@ test('composition rejects disconnected sources and nonlocal and out-of-output fr
   assert.equal((await checkComposition(root, 'tier-wiring')).status, 'pass');
   write('app/logic/b.js', 'window.ProbeLogic = { count: () => 0 };\n');
   assert.match((await checkComposition(root, 'tier-wiring')).evidence, /No static chain/);
+  assert.equal((await checkComposition(root, 'offline-startup')).status, 'not-run');
   frontend(write);
   write('app/web/index.html', page.replace('<main>', '<img src="https://example.invalid/no.png"><main>'));
   assert.match((await checkComposition(root, 'tier-wiring')).evidence, /remote/);
@@ -138,6 +141,86 @@ test('composition rejects disconnected sources and nonlocal and out-of-output fr
   write('app/logic/b.mjs', "import { value } from '../store/a.mjs';\nexport const count = () => value;\n");
   write('app/store/a.mjs', 'export const value = 1;\n');
   assert.equal((await checkComposition(root, 'tier-wiring')).status, 'pass');
+});
+
+test('composition traces browser-global wrappers and explicit factory injection, not sibling loads', async t => {
+  const { root, write } = temp(t);
+  const wrap = (name, factory, args = '') => `
+    (function (host, create) {
+      if (typeof module === 'object' && module.exports) module.exports = create(${args});
+      else host.${name} = create(${args});
+    })(typeof globalThis === 'object' ? globalThis : this, ${factory});
+  `;
+  write('app/web/index.html', page);
+  write('app/store/a.js', wrap('LocalValues', '() => ({ read: () => 1 })'));
+  write('app/logic/b.js', wrap('LocalLogic', 'store => ({ read: () => store.read() })', 'host.LocalValues'));
+  write('app/web/c.js', "document.querySelector('main').textContent = String(window.LocalLogic.read());");
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'pass');
+
+  write('app/logic/b.js', wrap('LocalLogic', '() => ({ create: ({ storage }) => ({ read: () => storage.read() }) })'));
+  const ui = `
+    (() => {
+      const store = window.LocalValues;
+      const service = window.LocalLogic.create({ storage: store });
+      document.querySelector('main').textContent = String(service.read());
+    })();
+  `;
+  write('app/web/c.js', ui);
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'pass');
+  write('app/web/c.js', ui.replace('{ storage: store }', '{ storage: { read: () => 0 } }'));
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'fail');
+
+  write('app/store/a.js', wrap('LocalValues', '() => ({ open: () => ({ read: () => 1 }) })'));
+  write('app/logic/b.js', wrap('LocalLogic', '() => ({ create: storage => ({ read: () => storage.read() }) })'));
+  const classic = `
+    (function () {
+      var store = window.LocalValues.open(), service = window.LocalLogic.create(store);
+      document.querySelector('main').textContent = String(service.read());
+    })();
+  `;
+  write('app/web/c.js', classic);
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'pass');
+  write('app/web/c.js', classic.replace(', service', ';\nstore = { read: () => 0 };\nvar service'));
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'fail');
+});
+
+test('composition resolves classic injection origins by lexical binding', async t => {
+  const { root, write } = temp(t);
+  write('app/web/index.html', page);
+  write('app/store/a.js', 'window.LocalValues = { read: () => 1 };\n');
+  write('app/logic/b.js', 'window.LocalLogic = { create: storage => ({ read: () => storage.read() }) };\n');
+  const cases = [
+    ['bare exports from earlier classic scripts', 'const store = LocalValues; LocalLogic.create({ storage: store });', 'pass'],
+    ['separate locals with the same name', `
+      const store = window.LocalValues;
+      window.LocalLogic.create(store);
+      function unrelated() { let store = {}; store = {}; }
+    `, 'pass'],
+    ['a write to the actual outer binding', `
+      let store = window.LocalValues;
+      function replace() { store = {}; }
+      replace();
+      window.LocalLogic.create(store);
+    `, 'fail'],
+    ['an IIFE parameter shadowing an outer origin', `
+      const store = window.LocalValues;
+      (function (store) { window.LocalLogic.create(store); })({});
+    `, 'fail'],
+    ['an IIFE name shadowing an outer origin', `
+      const store = window.LocalValues;
+      (function store() { window.LocalLogic.create(store); })();
+    `, 'fail'],
+    ['a block binding shadowing a bare export', `
+      { const LocalValues = {}; LocalLogic.create(LocalValues); }
+    `, 'fail']
+  ];
+  for (const [label, script, status] of cases) {
+    await t.test(label, async () => {
+      write('app/web/c.js', script);
+      const result = await checkComposition(root, 'tier-wiring');
+      assert.equal(result.status, status, result.evidence);
+    });
+  }
 });
 
 test('composition distinguishes wrong evidence from incomplete licensing and provenance evidence', async t => {
@@ -175,11 +258,85 @@ test('composition distinguishes wrong evidence from incomplete licensing and pro
   assert.match((await checkComposition(root, 'clue-discovery')).evidence, /duplicate or ambiguous JSON/);
 });
 
+test('author discovery accepts the same standalone comment syntax as the packaged readiness checker', async t => {
+  const { root, write } = temp(t);
+  const clues = structure(write);
+  clues[0].file = 'app/probe.vbs';
+  clues[1].file = 'docs/probe.html';
+  clues[2].file = 'app/web/probe.css';
+  write('quests/clues.json', clues);
+  write(clues[0].file, "\t' marker-01: probe-1\r\n");
+  write(clues[1].file, '<!-- marker-02: probe-2 -->\n');
+  write(clues[2].file, '/* marker-03: probe-3 */\n');
+  const wrapped = await checkComposition(root, 'clue-discovery');
+  assert.equal(wrapped.status, 'pass', wrapped.evidence);
+  write(clues[1].file, '<!-- marker-02: probe-2\n');
+  assert.match((await checkComposition(root, 'clue-discovery')).evidence, /correctly formatted marker line/);
+  write(clues[1].file, '<!-- marker-02: probe-2 --> trailing text\n');
+  assert.match((await checkComposition(root, 'clue-discovery')).evidence, /correctly formatted marker line/);
+});
+
+test('dependency metadata separates SHA-1 integrity gaps from license gaps and corroborates only bound entries', async t => {
+  const { root, write } = temp(t);
+  structure(write);
+  const file = path.join(root, 'package-lock.json');
+  const lock = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const location = 'node_modules/@microsoft/vally-cli';
+  const known = require('../package-lock.json').packages[location];
+  async function check(entry) {
+    lock.packages[location] = entry;
+    write('package-lock.json', lock);
+    return checkComposition(root, 'dependency-evidence');
+  }
+  const sha1 = `sha1-${Buffer.alloc(20).toString('base64')}`;
+  const weak = await check({ ...known, integrity: sha1 });
+  assert.equal(weak.status, 'not-testable');
+  assert.match(weak.evidence, /0 license, 1 integrity, 1 SHA-1 only, 0 identity/);
+  assert.match(weak.evidence, /Integrity not established.*README disclosure missing/);
+  const readme = '[Begin](quests/01-probe/README.md)\n';
+  write('README.md', `${readme}\nDependency licenses: recognized\nDependency integrity: not established\nSHA-1-only entries: 1\n`);
+  const disclosed = await check({ ...known, integrity: sha1 });
+  assert.equal(disclosed.status, 'not-testable');
+  assert.match(disclosed.evidence, /README disclosure present/);
+  assert.equal((await checkComposition(root, 'quest-briefs')).status, 'pass');
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'pass');
+  write('README.md', `${readme}\nDependency integrity: pass\nDependency integrity: not established\n`);
+  assert.match((await check({ ...known, integrity: sha1 })).evidence, /README disclosure missing or conflicting/);
+  write('README.md', `${readme}\n~~~text\nDependency integrity: not established\n~~~\n`);
+  assert.match((await check({ ...known, integrity: sha1 })).evidence, /README disclosure missing or conflicting/);
+  const readSync = fs.readFileSync;
+  const reference = require('../package-lock.json');
+  const authorLockPath = path.join(repo, 'package-lock.json');
+  const mockAuthorLock = t.mock.method(fs, 'readFileSync', (file, ...args) => file === authorLockPath
+    ? JSON.stringify({ packages: { ...reference.packages, [location]: { ...known, integrity: `${sha1} ${known.integrity}` } } })
+    : readSync(file, ...args));
+  try {
+    const corroborated = await check({ ...known, integrity: sha1 });
+    assert.equal(corroborated.status, 'not-testable');
+    assert.match(corroborated.evidence, /1 integrity, 1 SHA-1 only/);
+  } finally {
+    mockAuthorLock.mock.restore();
+  }
+  const malformed = await check({ ...known, integrity: 'sha512-YQ==' });
+  assert.equal(malformed.status, 'not-testable');
+  assert.match(malformed.evidence, /0 license, 1 integrity, 0 SHA-1 only/);
+  assert.equal((await check({ ...known, integrity: `${sha1} ${known.integrity}` })).status, 'pass');
+
+  const missingLicense = { ...known, license: undefined };
+  assert.match((await check(missingLicense)).evidence, /1 corroborated by the author lock/);
+  const differentArtifact = await check({ ...missingLicense, resolved: 'https://example.invalid/another.tgz' });
+  assert.equal(differentArtifact.status, 'not-testable');
+  assert.match(differentArtifact.evidence, /1 license, 0 integrity/);
+  assert.equal((await check({ ...known, license: 'UNLICENSED' })).status, 'fail');
+});
+
 test('offline startup observes file rendering and Tab focus, and rejects errors or remote requests', {
   skip: !process.env.HVE_QUEST_TEST_CHROMIUM
 }, async t => {
   const { root, write } = temp(t);
   frontend(write);
+  write('app/logic/b.js', 'window.ProbeLogic = { count: () => 0 };\n');
+  assert.equal((await checkComposition(root, 'tier-wiring')).status, 'fail');
   const options = { chromium: process.env.HVE_QUEST_TEST_CHROMIUM };
   const startup = await checkComposition(root, 'offline-startup', options);
   assert.equal(startup.status, 'pass', startup.evidence);

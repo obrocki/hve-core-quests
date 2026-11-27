@@ -3,7 +3,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-if ($OutputPath -match '^(?:[\\/]{2}|[a-z][a-z0-9+.-]*://)' -or $OutputPath.Contains('::')) {
+if ($OutputPath -match '^(?:[\\/]{2}|[a-z][a-z0-9+.-]*://)' -or $OutputPath.Contains('::') -or
+    $OutputPath -match '(?:^|[\\/])\.\.(?:[\\/]|$)' -or ($IsWindows -and $OutputPath -match '^[a-z]:(?![\\/])')) {
   throw 'OutputPath must be a local directory.'
 }
 $root = Get-Item -LiteralPath $OutputPath -Force
@@ -13,15 +14,36 @@ for ($parent = $root; $null -ne $parent; $parent = $parent.Parent) {
 }
 $rootFull = [IO.Path]::TrimEndingDirectorySeparator($root.FullName)
 $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
-$homeDir = Split-Path -Parent $PSScriptRoot
-if (Test-Path -LiteralPath (Join-Path $homeDir 'SKILL.md') -PathType Leaf) {
-  $repository = (Resolve-Path (Join-Path $PSScriptRoot '../../../..')).Path
-  $sep = [IO.Path]::DirectorySeparatorChar
-  if ($rootFull.Equals($repository, $comparison) -or $rootFull.StartsWith($repository + $sep, $comparison) -or $repository.StartsWith($rootFull + $sep, $comparison)) {
-    throw 'OutputPath must be separate from the formula repository.'
+function Test-ContainsPath([string]$Parent, [string]$Child) {
+  $prefix = if ([IO.Path]::EndsInDirectorySeparator($Parent)) { $Parent } else { $Parent + [IO.Path]::DirectorySeparatorChar }
+  $Child.Equals($Parent, $comparison) -or $Child.StartsWith($prefix, $comparison)
+}
+
+$pack = [IO.Directory]::GetParent($PSScriptRoot)
+if (Test-Path -LiteralPath (Join-Path $pack.FullName 'SKILL.md') -PathType Leaf) {
+  $boundary = $pack
+  if ($null -ne $pack.Parent -and $null -ne $pack.Parent.Parent -and $null -ne $pack.Parent.Parent.Parent -and
+      $pack.Parent.Name.Equals('skills', $comparison) -and $pack.Parent.Parent.Name.Equals('.github', $comparison)) {
+    $boundary = $pack.Parent.Parent.Parent
   }
-} elseif (-not $rootFull.Equals($homeDir, $comparison)) {
+  # An export inside a Git checkout still has that checkout's boundary; a loose pack has none.
+  for ($parent = $boundary; $parent.Parent; $parent = $parent.Parent) {
+    if (Test-Path -LiteralPath (Join-Path $parent.FullName '.git')) {
+      $boundary = $parent
+      break
+    }
+  }
+  if ((Test-ContainsPath $boundary.FullName $rootFull) -or (Test-ContainsPath $rootFull $boundary.FullName)) {
+    throw 'OutputPath must be separate from the formula pack or repository.'
+  }
+} elseif (-not $rootFull.Equals($pack.FullName, $comparison)) {
   throw 'Run the installed checker against its own output directory.'
+}
+for ($parent = $root; $parent.Parent; $parent = $parent.Parent) {
+  if ((Test-Path -LiteralPath (Join-Path $parent.FullName '.github/skills/legacy-quest-formula/SKILL.md') -PathType Leaf) -and
+      (Test-Path -LiteralPath (Join-Path $parent.FullName '.github/skills/legacy-quest-formula/scripts/Test-QuestReadiness.ps1') -PathType Leaf)) {
+    throw 'OutputPath must be outside the formula repository.'
+  }
 }
 
 # Resolve components before reading a file: lexical containment alone misses junctions.
@@ -146,33 +168,107 @@ foreach ($number in 1..12) {
   Test-ReadmeLinks $brief
 }
 
-$clues = @(Get-Content -Raw -LiteralPath (Join-Path $rootFull 'quests/clues.json') | ConvertFrom-Json)
-if ($clues.Count -ne 12 -or @($clues.quest | Sort-Object -Unique).Count -ne 12) {
-  throw 'Expected twelve unique quest clues.'
-}
-$hashLines = @(Get-Content -LiteralPath (Join-Path $rootFull 'quests/flags.sha256'))
-if ($hashLines.Count -ne 12 -or @($hashLines | ForEach-Object { ($_ -split ' ')[0] } | Sort-Object -Unique).Count -ne 12) {
-  throw 'Expected twelve unique flag hashes.'
-}
-foreach ($clue in $clues) {
-  $quest = [int]$clue.quest
-  if ($quest -notin 1..12) { throw "Invalid quest number: $($clue.quest)" }
-  $source = Get-OutputItem $clue.file
-  if ($source -isnot [IO.FileInfo]) { throw 'Expected a safe output-relative clue file.' }
-  $path = $source.FullName
-  $pattern = [regex]::Escape([string]$clue.marker) + ':\s*([a-z0-9-]+)'
-  $markerMatches = [regex]::Matches([IO.File]::ReadAllText($path), $pattern, [Text.RegularExpressions.RegexOptions]::IgnoreCase)
-  if ($markerMatches.Count -ne 1) { throw "Expected one $($clue.marker) marker." }
-  $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($markerMatches[0].Groups[1].Value))).ToLowerInvariant()
-  $expected = '{0:D2} {1}' -f $quest, $hash
-  if ($expected -notin $hashLines) { throw "Flag hash mismatch for quest $quest." }
+$hashLines = [IO.File]::ReadAllLines((Get-OutputItem 'quests/flags.sha256').FullName)
+$hashes = @{}
+$flagFormat = 'Expected twelve unique flag hashes in the required format.'
+if ($hashLines.Length -ne 12) { throw $flagFormat }
+foreach ($line in $hashLines) {
+  $row = [regex]::Match($line, '\A(0[1-9]|1[0-2]) ([a-f0-9]{64})\z')
+  if (-not $row.Success -or $hashes.ContainsKey($row.Groups[1].Value)) { throw $flagFormat }
+  $hashes.Add($row.Groups[1].Value, $row.Groups[2].Value)
 }
 
-$evalText = [IO.File]::ReadAllText((Join-Path $rootFull 'evals/eagledesk-quests/eval.yaml'))
-$stimulusMatches = [regex]::Matches($evalText, '(?m)^\s*-\s+name:\s+quest-(\d{2})[^\r\n]*')
-$stimulusNumbers = @($stimulusMatches | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
-if ($stimulusMatches.Count -ne 12 -or $stimulusNumbers.Count -ne 12 -or ($stimulusNumbers -join ',') -ne '01,02,03,04,05,06,07,08,09,10,11,12') {
-  throw 'Expected one Vally stimulus for each of the twelve quests.'
+try {
+  $clueDocument = [Text.Json.JsonDocument]::Parse([IO.File]::ReadAllText((Get-OutputItem 'quests/clues.json').FullName))
+} catch [Text.Json.JsonException] {
+  throw 'Malformed quest clue manifest.'
+}
+try {
+  $clues = $clueDocument.RootElement
+  if ($clues.ValueKind -ne 'Array' -or $clues.GetArrayLength() -ne 12) { throw 'Expected twelve unique quest clues.' }
+  $questsWithClues = [Collections.Generic.HashSet[int]]::new()
+  $markers = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+  foreach ($clue in $clues.EnumerateArray()) {
+    $quest = 0
+    if (-not (Test-Fields $clue @('quest', 'file', 'marker')) -or $clue.GetProperty('quest').ValueKind -ne 'Number' -or
+        -not $clue.GetProperty('quest').TryGetInt32([ref]$quest) -or $quest -notin 1..12 -or -not $questsWithClues.Add($quest) -or
+        $clue.GetProperty('file').ValueKind -ne 'String' -or $clue.GetProperty('marker').ValueKind -ne 'String') {
+      throw 'Expected a unique integer quest number, source path and marker.'
+    }
+    $marker = $clue.GetProperty('marker').GetString()
+    if (-not $marker.Trim() -or $marker -cne $marker.Trim() -or $marker -match '[:\r\n]' -or -not $markers.Add($marker)) {
+      throw 'Expected a unique nonblank clue marker.'
+    }
+    $source = Get-OutputItem ($clue.GetProperty('file').GetString())
+    if ($source -isnot [IO.FileInfo]) { throw 'Expected a safe output-relative clue file.' }
+    $prefix = [regex]::new('\A[ \t]*(?:(?<comment><!--|/\*|//|--|#|;|'')[ \t]*)?' + [regex]::Escape($marker) + ':',
+      [Text.RegularExpressions.RegexOptions]'IgnoreCase,CultureInvariant')
+    $count = 0
+    $value = $null
+    foreach ($line in [IO.File]::ReadLines($source.FullName)) {
+      $start = $prefix.Match($line)
+      if (-not $start.Success) { continue }
+      $count++
+      if (-not $start.Value.EndsWith("${marker}:", [StringComparison]::Ordinal)) { continue }
+      $end = switch ($start.Groups['comment'].Value) {
+        '<!--' { '-->' }
+        '/*' { '\*/' }
+        default { '' }
+      }
+      $flag = [regex]::Match($line.Substring($start.Length), '\A (?<value>[a-z0-9]+(?:-[a-z0-9]+)*)[ \t]*' + $end + '[ \t]*\z')
+      if ($flag.Success) { $value = $flag.Groups['value'].Value }
+    }
+    if ($count -ne 1 -or -not $value) { throw "Expected one correctly formatted clue marker line for quest $quest." }
+    $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($value))).ToLowerInvariant()
+    if ($hash -cne $hashes[('{0:D2}' -f $quest)]) { throw "Flag hash mismatch for quest $quest." }
+  }
+} finally {
+  $clueDocument.Dispose()
 }
 
-Write-Output 'Structural readiness passed: local provenance fields, required files and links, twelve briefs, clue markers/hashes and twelve Vally stimuli. Distribution: not-cleared. This does not verify origin, authorize release, test frontend behavior or establish learner competency.'
+function Get-BlockItems([string]$Text, [int]$MinimumIndent) {
+  $first = [regex]::Match($Text, '(?m)^(?<indent> *)[^ #\n]')
+  if (-not $first.Success -or $first.Groups['indent'].Length -lt $MinimumIndent) { return }
+  $indent = $first.Groups['indent'].Value
+  [regex]::Matches($Text, "(?ms)^(?<indent>$indent)(?<header>[^ #\n][^\n]*)\n?(?<body>.*?)(?=^$indent[^ #\n]|\z)")
+}
+
+function Get-YamlSlug([string]$Text) {
+  [regex]::Match($Text, '\A[ \t]*(?<quote>["'']?)(?<slug>[a-z0-9]+(?:-[a-z0-9]+)*)\k<quote>(?:[ \t]+#[^\n]*)?[ \t]*\z').Groups['slug'].Value
+}
+
+# Inspect only the documented block-list form; Vally lint owns full YAML and grader validation.
+$evalText = [IO.File]::ReadAllText((Get-OutputItem 'evals/eagledesk-quests/eval.yaml').FullName).Replace("`r`n", "`n")
+$stimulusError = 'Expected one Vally stimulus for each of the twelve quests in the stimuli block list.'
+$blocks = [regex]::Matches($evalText, '(?ms)^stimuli:[ \t]*(?:#[^\n]*)?\n(?<items>.*?)(?=^[^ #\n-]|\z)')
+if ($blocks.Count -ne 1) { throw $stimulusError }
+$stimuli = @(Get-BlockItems $blocks[0].Groups['items'].Value 0)
+if ($stimuli.Count -ne 12) { throw $stimulusError }
+$questNumbers = [Collections.Generic.HashSet[string]]::new()
+$graderNames = [Collections.Generic.HashSet[string]]::new()
+$graderError = 'Expected at least one typed grader per Vally stimulus, with globally unique grader names.'
+foreach ($stimulus in $stimuli) {
+  $header = [regex]::Match($stimulus.Groups['header'].Value, '\A- name:[ \t]+(?<value>.*)\z')
+  $name = Get-YamlSlug $header.Groups['value'].Value
+  if ($name -cnotmatch '\Aquest-(0[1-9]|1[0-2])-' -or -not $questNumbers.Add($name.Substring(6, 2))) { throw $stimulusError }
+  $indent = $stimulus.Groups['indent'].Value + '  '
+  $graders = [regex]::Matches($stimulus.Groups['body'].Value,
+    "(?ms)^${indent}graders:[ \t]*(?:#[^\n]*)?\n(?<items>.*?)(?=^${indent}[^ #\n-]|\z)")
+  if ($graders.Count -ne 1) { throw $graderError }
+  $items = @(Get-BlockItems $graders[0].Groups['items'].Value $indent.Length)
+  if (-not $items.Count) { throw $graderError }
+  foreach ($grader in $items) {
+    $header = $grader.Groups['header'].Value
+    $fieldIndent = $grader.Groups['indent'].Value + '  '
+    if ($header -cnotmatch '\A-(?: |\z)') { throw $graderError }
+    $fields = "$fieldIndent$($header.Substring([Math]::Min(2, $header.Length)))`n$($grader.Groups['body'].Value)"
+    $types = [regex]::Matches($fields, "(?m)^${fieldIndent}type:[ \t]+(?<value>[^\n]*)$")
+    $names = [regex]::Matches($fields, "(?m)^${fieldIndent}name:[ \t]+(?<value>[^\n]*)$")
+    if ($types.Count -ne 1 -or $names.Count -ne 1 -or -not (Get-YamlSlug $types[0].Groups['value'].Value) -or
+        -not ($graderName = Get-YamlSlug $names[0].Groups['value'].Value) -or -not $graderNames.Add($graderName)) {
+      throw $graderError
+    }
+  }
+}
+
+Write-Output 'Structural readiness passed: local provenance fields, required files and links, twelve briefs, clue markers/hashes and twelve Vally stimuli with named typed graders. Distribution: not-cleared. This does not verify origin, authorize release, test frontend behavior or establish learner competency.'

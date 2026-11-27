@@ -36,7 +36,7 @@ async function main([kind, argument, ...rest]) {
     for (const quest of questIds) results.push(checkBehavior(root, quest));
   }
   console.log(JSON.stringify(results, null, 2));
-  process.exitCode = results.some(result => ['error', 'not-testable'].includes(result.status)) ? 2
+  process.exitCode = results.some(result => ['error', 'not-run', 'not-testable'].includes(result.status)) ? 2
     : results.some(result => result.status === 'fail') ? 1 : 0;
 }
 
